@@ -1,0 +1,141 @@
+{
+  "name": "Project",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Project name"
+    },
+    "description": {
+      "type": "string",
+      "description": "Brief description of the automation"
+    },
+    "automation_type": {
+      "type": "string",
+      "enum": [
+        "Python",
+        "Ansible Playbook",
+        "PowerShell",
+        "Bash"
+      ],
+      "description": "Target automation language"
+    },
+    "technology_area": {
+      "type": "string",
+      "enum": [
+        "Linux",
+        "Windows",
+        "Network",
+        "Firewall",
+        "Database",
+        "Middleware",
+        "Observability",
+        "Big Data",
+        "Virtualization",
+        "AIX",
+        "Storage",
+        "Mainframe"
+      ],
+      "description": "Infrastructure technology area"
+    },
+    "target_scope": {
+      "type": "string",
+      "description": "Target systems or scope description"
+    },
+    "risk_tier": {
+      "type": "string",
+      "enum": [
+        "Low",
+        "Medium",
+        "High",
+        "Critical"
+      ],
+      "default": "Medium"
+    },
+    "credential_need": {
+      "type": "string",
+      "enum": [
+        "None",
+        "Service Account",
+        "Vault Secret",
+        "API Token",
+        "Certificate"
+      ],
+      "description": "Type of credential required (never the value)"
+    },
+    "backout_approach": {
+      "type": "string",
+      "enum": [
+        "Automatic Rollback",
+        "Manual Rollback",
+        "Snapshot Restore",
+        "Configuration Backup",
+        "No Backout Required"
+      ],
+      "description": "Recovery/backout strategy"
+    },
+    "concurrency_risk": {
+      "type": "string",
+      "enum": [
+        "None",
+        "Low",
+        "Medium",
+        "High"
+      ],
+      "default": "None",
+      "description": "Risk of concurrent execution conflicts"
+    },
+    "testing_plan": {
+      "type": "string",
+      "description": "How testing evidence will be gathered"
+    },
+    "observability_needs": {
+      "type": "string",
+      "description": "Logging and reporting requirements"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Draft",
+        "In Progress",
+        "Review",
+        "Approved",
+        "Published"
+      ],
+      "default": "Draft"
+    },
+    "compliance_score": {
+      "type": "number",
+      "description": "Overall compliance percentage 0-100"
+    },
+    "check_results": {
+      "type": "object",
+      "description": "Policy check results per standard"
+    },
+    "generated_code": {
+      "type": "string",
+      "description": "Main automation artifact code"
+    },
+    "metadata_schema": {
+      "type": "string",
+      "description": "Run metadata schema JSON/YAML"
+    },
+    "readme_content": {
+      "type": "string",
+      "description": "Generated README content"
+    },
+    "backout_content": {
+      "type": "string",
+      "description": "Backout documentation/hook"
+    },
+    "evidence_pack": {
+      "type": "object",
+      "description": "Evidence pack artifact data"
+    }
+  },
+  "required": [
+    "name",
+    "automation_type",
+    "technology_area"
+  ]
+}

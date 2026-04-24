@@ -1,0 +1,117 @@
+{
+  "name": "Standard",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Standard name"
+    },
+    "slug": {
+      "type": "string",
+      "description": "URL-friendly identifier"
+    },
+    "classification_layer": {
+      "type": "number",
+      "default": 4,
+      "description": "Classification layer number"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Draft",
+        "Active",
+        "Deprecated"
+      ],
+      "default": "Active"
+    },
+    "owner": {
+      "type": "string",
+      "description": "Team or role that owns this standard"
+    },
+    "last_reviewed": {
+      "type": "string",
+      "format": "date"
+    },
+    "applies_to": {
+      "type": "string",
+      "description": "Scope of applicability"
+    },
+    "purpose": {
+      "type": "string",
+      "description": "1-3 sentences: risk controlled + outcome"
+    },
+    "standard_statement": {
+      "type": "string",
+      "description": "Single normative requirement"
+    },
+    "author_obligations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Actionable obligations for the automation author"
+    },
+    "platform_controls": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Platform and pipeline controls (not author-owned)"
+    },
+    "approval_gate_requirements": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Minimal, verifiable evidence for approval"
+    },
+    "template_references": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "References to approved templates/patterns"
+    },
+    "anti_patterns": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Concrete anti-patterns to avoid"
+    },
+    "review_checklist": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Yes/no checklist items mapping to obligations"
+    },
+    "related_standards": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Slugs of related standards"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "Author Standard",
+        "Platform Enforcement",
+        "Approval Gate",
+        "Template Requirement",
+        "Guidance"
+      ],
+      "default": "Author Standard"
+    },
+    "order": {
+      "type": "number",
+      "description": "Display order"
+    }
+  },
+  "required": [
+    "name",
+    "slug",
+    "category"
+  ]
+}

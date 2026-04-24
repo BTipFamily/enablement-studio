@@ -1,0 +1,50 @@
+{
+  "name": "Template",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Template name"
+    },
+    "automation_type": {
+      "type": "string",
+      "enum": [
+        "Python",
+        "Ansible Playbook",
+        "PowerShell",
+        "Bash"
+      ]
+    },
+    "technology_area": {
+      "type": "string",
+      "description": "Target technology or 'Universal'"
+    },
+    "description": {
+      "type": "string"
+    },
+    "main_code": {
+      "type": "string",
+      "description": "Main automation code template"
+    },
+    "metadata_schema": {
+      "type": "string",
+      "description": "Run metadata schema template"
+    },
+    "readme_template": {
+      "type": "string",
+      "description": "README template"
+    },
+    "backout_template": {
+      "type": "string",
+      "description": "Backout hook/documentation template"
+    },
+    "is_starter": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "name",
+    "automation_type"
+  ]
+}
