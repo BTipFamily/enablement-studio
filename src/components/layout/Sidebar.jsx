@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { 
-  LayoutDashboard, Shield, Wand2, Code2, FileText, 
-  ChevronLeft, ChevronRight, Zap
+import {
+  LayoutDashboard, Shield, Wand2, Code2, FileText,
+  ScanSearch, ChevronLeft, ChevronRight, Zap
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -11,6 +11,7 @@ const navItems = [
   { path: "/Standards", label: "Standards Registry", icon: Shield },
   { path: "/BuildWizard", label: "Build Wizard", icon: Wand2 },
   { path: "/Workspace", label: "Workspace", icon: Code2 },
+  { path: "/Validator", label: "Code Validator", icon: ScanSearch },
   { path: "/Documentation", label: "PRD & Docs", icon: FileText },
 ];
 

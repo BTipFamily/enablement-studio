@@ -12,6 +12,7 @@ import Standards from '@/pages/Standards';
 import BuildWizard from '@/pages/BuildWizard';
 import Workspace from '@/pages/Workspace';
 import Documentation from '@/pages/Documentation';
+import Validator from '@/pages/Validator';
 
 const PasswordForm = ({ onLogin }) => {
   const [password, setPassword] = useState('');
@@ -72,6 +73,7 @@ const AuthenticatedApp = () => {
         <Route path="/Standards" element={<Standards />} />
         <Route path="/BuildWizard" element={<BuildWizard />} />
         <Route path="/Workspace" element={<Workspace />} />
+        <Route path="/Validator" element={<Validator />} />
         <Route path="/Documentation" element={<Documentation />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />

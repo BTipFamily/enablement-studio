@@ -113,7 +113,7 @@ const ARCHITECTURE_CONTENT = `# Architecture
 └─────────────────────────────────────────────────────┘
                         │
               ┌─────────┴─────────┐
-              │   Base44 Backend  │
+              │   Atelier Backend  │
               │  ┌─────────────┐  │
               │  │  Entities   │  │
               │  │ - Standard  │  │
