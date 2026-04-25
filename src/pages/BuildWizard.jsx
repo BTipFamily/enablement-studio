@@ -8,10 +8,35 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { ArrowLeft, ArrowRight, Wand2, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Wand2, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import WizardStep from "@/components/wizard/WizardStep";
 import { STARTER_TEMPLATES, runPolicyChecks, getComplianceScore } from "@/lib/standards-data";
+import { cn } from "@/lib/utils";
+
+const APPROVED_DOMAINS = [
+  "linux", "windows", "network", "firewall", "db", "middleware",
+  "observability", "bigdata", "virt", "aix", "storage", "mainframe", "platform",
+];
+
+function validateName(name) {
+  if (!name) return null;
+  const errors = [];
+  if (/\s/.test(name))
+    errors.push("No spaces — use hyphens between words");
+  if (/_/.test(name))
+    errors.push("Use hyphens (-) not underscores — underscores are for variable names only");
+  if (/[^a-z0-9-]/.test(name.replace(/\s/g, "").replace(/_/g, "")))
+    errors.push("Only lowercase letters, numbers, and hyphens allowed");
+  else if (name !== name.toLowerCase())
+    errors.push("Lowercase only");
+  const parts = name.toLowerCase().split("-").filter(Boolean);
+  if (parts.length > 0 && !APPROVED_DOMAINS.includes(parts[0]))
+    errors.push(`"${parts[0]}" is not an approved domain prefix — choose from: ${APPROVED_DOMAINS.join(", ")}`);
+  if (parts.length < 3)
+    errors.push("Must have at least 3 parts: [domain]-[action]-[target]");
+  return errors;
+}
 
 const STEPS = [
   { label: "Basics", key: "basics" },
@@ -70,7 +95,11 @@ export default function BuildWizard() {
   const update = (field, value) => setFormData(prev => ({ ...prev, [field]: value }));
 
   const canProceed = () => {
-    if (step === 1) return formData.name && formData.automation_type && formData.technology_area;
+    if (step === 1) {
+      const nameErrors = validateName(formData.name);
+      return formData.name && nameErrors !== null && nameErrors.length === 0
+        && formData.automation_type && formData.technology_area;
+    }
     if (step === 2) return formData.risk_tier && formData.target_scope;
     if (step === 3) return formData.backout_approach && formData.credential_need;
     if (step === 4) return formData.testing_plan;
@@ -107,12 +136,51 @@ export default function BuildWizard() {
 
   const renderStep = () => {
     switch(step) {
-      case 1:
+      case 1: {
+        const nameErrors = validateName(formData.name);
+        const nameValid = nameErrors !== null && nameErrors.length === 0;
+        const nameTouched = formData.name.length > 0;
         return (
           <div className="space-y-5">
             <div>
               <Label htmlFor="name" className="text-sm font-medium">Automation Name</Label>
-              <Input id="name" value={formData.name} onChange={e => update("name", e.target.value)} placeholder="e.g., linux-patch-deployment" className="mt-1.5" />
+              <p className="text-xs text-muted-foreground mb-1.5 mt-0.5">
+                Format: <code className="font-mono bg-muted px-1 rounded">[domain]-[action]-[target]</code>
+                {" "}e.g. <code className="font-mono bg-muted px-1 rounded">linux-patch-hosts</code>
+              </p>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={e => update("name", e.target.value)}
+                placeholder="e.g., linux-patch-hosts"
+                className={cn(
+                  "mt-0.5 font-mono",
+                  nameTouched && nameValid && "border-success focus-visible:ring-success",
+                  nameTouched && !nameValid && "border-destructive focus-visible:ring-destructive",
+                )}
+              />
+              {nameTouched && (
+                <div className="mt-2 space-y-1">
+                  {nameValid ? (
+                    <div className="flex items-center gap-1.5 text-xs text-success">
+                      <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+                      Valid naming format
+                    </div>
+                  ) : (
+                    nameErrors.map((err, i) => (
+                      <div key={i} className="flex items-start gap-1.5 text-xs text-destructive">
+                        <XCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                        {err}
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+              {!nameTouched && (
+                <p className="mt-1.5 text-[11px] text-muted-foreground/60">
+                  Approved domains: {APPROVED_DOMAINS.join(" · ")}
+                </p>
+              )}
             </div>
             <div>
               <Label htmlFor="desc" className="text-sm font-medium">Description</Label>
@@ -140,6 +208,7 @@ export default function BuildWizard() {
             </div>
           </div>
         );
+      }
       case 2:
         return (
           <div className="space-y-5">
