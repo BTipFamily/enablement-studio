@@ -3,16 +3,42 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   Shield, Eye, Wrench, ChevronRight, CheckCircle, XCircle, 
-  AlertTriangle, BookOpen, Settings, FileText, ChevronDown, ChevronUp
+  AlertTriangle, BookOpen, Settings, FileText, ChevronDown, ChevronUp,
+  RefreshCw, GitBranch, Clock, AlertCircle, CheckCircle2, Copy, Check, FileCode
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AUTHOR_STANDARDS, NON_AUTHOR_ITEMS } from "@/lib/standards-data";
+import { useStandardsSync } from "@/hooks/use-standards-sync";
 import CategoryBadge from "@/components/shared/CategoryBadge";
+import { REFERENCE_EXAMPLES } from "@/lib/reference-examples";
 
-function StandardDetail({ standard }) {
+function StandardDetail({ standard, enriched }) {
   const [viewMode, setViewMode] = useState("what");
+  const [openExample, setOpenExample] = useState(null);
+  const [copied, setCopied] = useState(false);
+
+  const examples = REFERENCE_EXAMPLES[standard.slug] || [];
+
+  const handleCopy = async () => {
+    if (!openExample?.content) return;
+    try {
+      await navigator.clipboard.writeText(openExample.content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // clipboard API unavailable — no-op
+    }
+  };
+
+  // Use repo-fetched standard statement if available, fall back to static
+  const standardStatement = enriched?.standard_statement || standard.standard_statement;
 
   return (
     <motion.div
@@ -30,6 +56,12 @@ function StandardDetail({ standard }) {
           <div className="flex items-center gap-2">
             <CategoryBadge category={standard.category} />
             <Badge variant="secondary">{standard.status}</Badge>
+            {enriched && (
+              <Badge variant="outline" className="text-[10px] gap-1 text-success border-success/30">
+                <CheckCircle2 className="w-3 h-3" />
+                Repo synced
+              </Badge>
+            )}
           </div>
         </div>
         <p className="text-sm leading-relaxed">{standard.purpose}</p>
@@ -51,7 +83,7 @@ function StandardDetail({ standard }) {
           <Card className="border-primary/20 bg-primary/5">
             <CardContent className="p-4">
               <p className="text-xs font-medium text-primary mb-1">STANDARD STATEMENT</p>
-              <p className="text-sm font-medium">{standard.standard_statement}</p>
+              <p className="text-sm font-medium">{standardStatement}</p>
             </CardContent>
           </Card>
 
@@ -121,17 +153,48 @@ function StandardDetail({ standard }) {
         </TabsContent>
 
         <TabsContent value="how" className="mt-4 space-y-5">
-          {/* Templates */}
+          {/* Reference Implementations — clickable, copy-able code examples */}
+          {examples.length > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold mb-1 flex items-center gap-2">
+                <FileCode className="w-4 h-4 text-chart-5" />
+                Reference Implementations
+              </h3>
+              <p className="text-xs text-muted-foreground mb-3">Click any example to view and copy</p>
+              <div className="space-y-2">
+                {examples.map(example => (
+                  <button
+                    key={example.id}
+                    onClick={() => setOpenExample(example)}
+                    className="w-full text-left p-3 rounded-lg border border-chart-5/20 bg-chart-5/5 hover:border-chart-5/50 hover:bg-chart-5/10 transition-all flex items-start gap-3 group"
+                  >
+                    <FileCode className="w-4 h-4 text-chart-5 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-medium">{example.title}</span>
+                        <Badge variant="outline" className="text-[10px] font-mono px-1.5 py-0">{example.language}</Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5 leading-snug">{example.description}</p>
+                      <p className="text-[10px] text-muted-foreground/60 font-mono mt-1">{example.filename}</p>
+                    </div>
+                    <Copy className="w-3.5 h-3.5 text-muted-foreground/50 group-hover:text-muted-foreground flex-shrink-0 mt-1 transition-colors" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Named Template References */}
           <div>
             <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-              <FileText className="w-4 h-4 text-chart-5" />
-              Templates & Patterns
+              <FileText className="w-4 h-4 text-muted-foreground" />
+              Named Template References
             </h3>
             <div className="space-y-2">
               {standard.template_references.map((ref, i) => (
-                <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-chart-5/5 border border-chart-5/10">
-                  <FileText className="w-4 h-4 text-chart-5 flex-shrink-0" />
-                  <span className="text-sm font-mono">{ref}</span>
+                <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border/50">
+                  <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                  <span className="text-sm font-mono text-muted-foreground">{ref}</span>
                 </div>
               ))}
             </div>
@@ -169,6 +232,35 @@ function StandardDetail({ standard }) {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Code Viewer Sheet */}
+      <Sheet open={!!openExample} onOpenChange={() => { setOpenExample(null); setCopied(false); }}>
+        <SheetContent side="right" className="w-[92vw] sm:w-[680px] sm:max-w-[680px] flex flex-col p-0 gap-0">
+          <SheetHeader className="p-5 border-b flex-shrink-0">
+            <SheetTitle className="text-base leading-snug pr-8">{openExample?.title}</SheetTitle>
+            <SheetDescription className="text-xs mt-1 leading-snug">{openExample?.description}</SheetDescription>
+            <div className="flex items-center gap-2 mt-3">
+              <Badge variant="outline" className="font-mono text-[10px] px-2">{openExample?.language}</Badge>
+              <Badge variant="outline" className="font-mono text-[10px] px-2">{openExample?.filename}</Badge>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCopy}
+                className="ml-auto h-7 text-xs gap-1.5"
+              >
+                {copied
+                  ? <><Check className="w-3 h-3 text-green-500" />Copied!</>
+                  : <><Copy className="w-3 h-3" />Copy</>}
+              </Button>
+            </div>
+          </SheetHeader>
+          <ScrollArea className="flex-1">
+            <pre className="p-5 text-[11px] font-mono leading-relaxed whitespace-pre-wrap break-words text-foreground/90">
+              <code>{openExample?.content}</code>
+            </pre>
+          </ScrollArea>
+        </SheetContent>
+      </Sheet>
     </motion.div>
   );
 }
@@ -178,17 +270,241 @@ export default function Standards() {
   const initialStandard = urlParams.get("standard");
   const [selectedSlug, setSelectedSlug] = useState(initialStandard || AUTHOR_STANDARDS[0].slug);
   const [showNonAuthor, setShowNonAuthor] = useState(false);
+  const [showRepoConfig, setShowRepoConfig] = useState(false);
+
+  const {
+    config,
+    setConfig,
+    saveConfig,
+    sync,
+    syncing,
+    lastSyncedAt,
+    syncError,
+    enrichedStandards,
+    isConfigured,
+  } = useStandardsSync();
 
   const selectedStandard = AUTHOR_STANDARDS.find(s => s.slug === selectedSlug) || AUTHOR_STANDARDS[0];
 
+  const formatSyncTime = (iso) => {
+    if (!iso) return null;
+    const d = new Date(iso);
+    return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  };
+
   return (
     <div className="p-6 lg:p-10 max-w-7xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold tracking-tight">Standards Registry</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          7 consolidated author standards — what you must build into your automation
-        </p>
+      <div className="mb-8 flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Standards Registry</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            7 consolidated author standards — what you must build into your automation
+          </p>
+        </div>
+        {/* Sync status badge */}
+        <div className="flex items-center gap-2">
+          {enrichedStandards && (
+            <Badge variant="outline" className="text-[10px] gap-1 text-success border-success/30">
+              <CheckCircle2 className="w-3 h-3" />
+              Repo synced
+            </Badge>
+          )}
+          {lastSyncedAt && (
+            <span className="text-xs text-muted-foreground flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              {formatSyncTime(lastSyncedAt)}
+            </span>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowRepoConfig(!showRepoConfig)}
+            className="h-8 text-xs gap-1.5"
+          >
+            <GitBranch className="w-3.5 h-3.5" />
+            Repo source
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={sync}
+            disabled={syncing || !isConfigured}
+            className="h-8 text-xs gap-1.5"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${syncing ? "animate-spin" : ""}`} />
+            {syncing ? "Syncing…" : "Sync now"}
+          </Button>
+        </div>
       </div>
+
+      {/* Repo configuration panel */}
+      <AnimatePresence>
+        {showRepoConfig && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden mb-6"
+          >
+            <Card className="border-primary/20 bg-primary/3">
+              <CardContent className="p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold flex items-center gap-2">
+                      <GitBranch className="w-4 h-4 text-primary" />
+                      Standards Repository Source
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Point this app to the Git repository containing your layer4-standards Markdown files.
+                      The app will auto-fetch updated content and use it in policy descriptions.
+                    </p>
+                  </div>
+                </div>
+
+                {syncError && (
+                  <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/5 border border-destructive/20 text-xs text-destructive">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    {syncError}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Provider</Label>
+                    <select
+                      value={config.provider}
+                      onChange={e => setConfig({ provider: e.target.value })}
+                      className="w-full h-9 rounded-md border bg-background px-3 text-sm"
+                    >
+                      <option value="github">GitHub</option>
+                      <option value="gitlab">GitLab</option>
+                      <option value="raw">Raw URL</option>
+                    </select>
+                  </div>
+
+                  {config.provider === "github" && (
+                    <>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">GitHub Owner / Org</Label>
+                        <Input
+                          value={config.githubOwner}
+                          onChange={e => setConfig({ githubOwner: e.target.value })}
+                          placeholder="e.g. my-org"
+                          className="h-9 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Repository Name</Label>
+                        <Input
+                          value={config.githubRepo}
+                          onChange={e => setConfig({ githubRepo: e.target.value })}
+                          placeholder="e.g. 13731_Automation_Framework"
+                          className="h-9 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Branch</Label>
+                        <Input
+                          value={config.githubBranch}
+                          onChange={e => setConfig({ githubBranch: e.target.value })}
+                          placeholder="main"
+                          className="h-9 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Standards Folder Path</Label>
+                        <Input
+                          value={config.githubFolderPath}
+                          onChange={e => setConfig({ githubFolderPath: e.target.value })}
+                          placeholder="layer4-standards"
+                          className="h-9 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Personal Access Token (private repos)</Label>
+                        <Input
+                          type="password"
+                          value={config.githubToken}
+                          onChange={e => setConfig({ githubToken: e.target.value })}
+                          placeholder="ghp_… (stored in browser only)"
+                          className="h-9 text-sm"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {config.provider === "gitlab" && (
+                    <>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">GitLab Project ID</Label>
+                        <Input
+                          value={config.gitlabProjectId}
+                          onChange={e => setConfig({ gitlabProjectId: e.target.value })}
+                          placeholder="e.g. 12345678"
+                          className="h-9 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Branch</Label>
+                        <Input
+                          value={config.gitlabBranch}
+                          onChange={e => setConfig({ gitlabBranch: e.target.value })}
+                          placeholder="main"
+                          className="h-9 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Standards Folder Path</Label>
+                        <Input
+                          value={config.gitlabFolderPath}
+                          onChange={e => setConfig({ gitlabFolderPath: e.target.value })}
+                          placeholder="layer4-standards"
+                          className="h-9 text-sm"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {config.provider === "raw" && (
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <Label className="text-xs">Base URL (files will be appended)</Label>
+                      <Input
+                        value={config.rawBaseUrl}
+                        onChange={e => setConfig({ rawBaseUrl: e.target.value })}
+                        placeholder="https://example.com/standards"
+                        className="h-9 text-sm"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 pt-1">
+                  <Button
+                    size="sm"
+                    onClick={() => { saveConfig(); setShowRepoConfig(false); }}
+                    className="text-xs h-8"
+                  >
+                    Save & Close
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => { saveConfig(); sync(); }}
+                    disabled={syncing || !isConfigured}
+                    className="text-xs h-8 gap-1.5"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${syncing ? "animate-spin" : ""}`} />
+                    Save & Sync
+                  </Button>
+                  <p className="text-xs text-muted-foreground ml-1">
+                    Cached for 4 hours · auto-refreshed on each visit when stale
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Standards list */}
@@ -281,7 +597,10 @@ export default function Standards() {
         <div className="lg:col-span-8">
           <Card>
             <CardContent className="p-6">
-              <StandardDetail standard={selectedStandard} />
+              <StandardDetail
+                standard={selectedStandard}
+                enriched={enrichedStandards?.[selectedStandard.slug] ?? null}
+              />
             </CardContent>
           </Card>
         </div>
