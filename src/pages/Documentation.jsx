@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileText, Globe, Code2, Target } from "lucide-react";
+import { FileText, Globe, Code2, Target, BookOpen } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import README from "../../README.md?raw";
 
 const PRD_CONTENT = `# Automation Enablement Studio — Product Requirements Document
 
@@ -262,6 +263,7 @@ const MVP_CONTENT = `# MVP Build Plan
 `;
 
 const tabs = [
+  { id: "readme", label: "README", icon: BookOpen, content: README },
   { id: "prd", label: "PRD", icon: FileText, content: PRD_CONTENT },
   { id: "architecture", label: "Architecture", icon: Globe, content: ARCHITECTURE_CONTENT },
   { id: "api", label: "API Design", icon: Code2, content: API_CONTENT },
@@ -269,7 +271,7 @@ const tabs = [
 ];
 
 export default function Documentation() {
-  const [activeTab, setActiveTab] = useState("prd");
+  const [activeTab, setActiveTab] = useState("readme");
 
   return (
     <div className="p-6 lg:p-10 max-w-5xl mx-auto">
