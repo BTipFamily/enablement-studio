@@ -8,10 +8,11 @@
  * PolicyPanel always reflects the most recent requirements.
  *
  * Supported providers:
- *   "github"  — uses the GitHub raw content API (no auth required for public repos;
- *               set STANDARDS_REPO_CONFIG.githubToken via localStorage for private repos)
- *   "gitlab"  — uses the GitLab raw file API
- *   "raw"     — direct URL per file; set rawBaseUrl in the config
+ *   "github"       — uses the GitHub raw content API (no auth required for public repos;
+ *                    set STANDARDS_REPO_CONFIG.githubToken via localStorage for private repos)
+ *   "gitlab"       — uses the GitLab raw file API
+ *   "azuredevops" — uses the Azure DevOps REST API; requires a PAT for private projects
+ *   "raw"          — direct URL per file; set rawBaseUrl in the config
  */
 
 export const STANDARDS_REPO_CONFIG_KEY = "atelier_standards_repo_config";
@@ -23,7 +24,7 @@ export const STANDARDS_CACHE_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
  * standards repository. Stored values in localStorage override these.
  */
 export const DEFAULT_STANDARDS_REPO_CONFIG = {
-  provider: "github",          // "github" | "gitlab" | "raw"
+  provider: "github",          // "github" | "gitlab" | "azuredevops" | "raw"
   githubOwner: "",             // e.g. "my-org"
   githubRepo: "",              // e.g. "13731_Automation_Framework"
   githubBranch: "main",        // branch to read from
@@ -31,6 +32,12 @@ export const DEFAULT_STANDARDS_REPO_CONFIG = {
   gitlabProjectId: "",         // for gitlab provider
   gitlabBranch: "main",
   gitlabFolderPath: "layer4-standards",
+  adoOrganization: "",         // Azure DevOps org name (e.g. "my-org")
+  adoProject: "",              // Azure DevOps project name
+  adoRepo: "",                 // Azure DevOps repository name
+  adoBranch: "main",           // branch to read from
+  adoFolderPath: "layer4-standards", // path within the repo
+  adoToken: "",                // Azure DevOps PAT (stored in localStorage only)
   rawBaseUrl: "",              // for raw provider, base URL before filename
   githubToken: "",             // PAT for private repos (stored in localStorage only)
 };
@@ -80,6 +87,10 @@ export function buildFileUrl(config, filename) {
       const encodedPath = encodeURIComponent(`${config.gitlabFolderPath}/${filename}`);
       return `https://gitlab.com/api/v4/projects/${config.gitlabProjectId}/repository/files/${encodedPath}/raw?ref=${config.gitlabBranch}`;
     }
+    case "azuredevops": {
+      const itemPath = encodeURIComponent(`${config.adoFolderPath}/${filename}`);
+      return `https://dev.azure.com/${encodeURIComponent(config.adoOrganization)}/${encodeURIComponent(config.adoProject)}/_apis/git/repositories/${encodeURIComponent(config.adoRepo)}/items?path=${itemPath}&versionDescriptor.version=${encodeURIComponent(config.adoBranch)}&versionDescriptor.versionType=branch&$format=text&api-version=7.0`;
+    }
     case "raw":
       return `${config.rawBaseUrl}/${filename}`;
     default:
@@ -94,6 +105,10 @@ export function buildFetchHeaders(config) {
   const headers = { Accept: "text/plain" };
   if (config.provider === "github" && config.githubToken) {
     headers["Authorization"] = `Bearer ${config.githubToken}`;
+  }
+  if (config.provider === "azuredevops" && config.adoToken) {
+    // Azure DevOps uses HTTP Basic auth with an empty username and the PAT as the password
+    headers["Authorization"] = `Basic ${btoa(`:${config.adoToken}`)}`;
   }
   return headers;
 }

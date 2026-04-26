@@ -377,6 +377,7 @@ export default function Standards() {
                       className="w-full h-9 rounded-md border bg-background px-3 text-sm"
                     >
                       <option value="github">GitHub</option>
+                      <option value="azuredevops">Azure DevOps</option>
                       <option value="gitlab">GitLab</option>
                       <option value="raw">Raw URL</option>
                     </select>
@@ -459,6 +460,66 @@ export default function Standards() {
                           value={config.gitlabFolderPath}
                           onChange={e => setConfig({ gitlabFolderPath: e.target.value })}
                           placeholder="layer4-standards"
+                          className="h-9 text-sm"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {config.provider === "azuredevops" && (
+                    <>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Organization</Label>
+                        <Input
+                          value={config.adoOrganization}
+                          onChange={e => setConfig({ adoOrganization: e.target.value })}
+                          placeholder="e.g. my-org"
+                          className="h-9 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Project</Label>
+                        <Input
+                          value={config.adoProject}
+                          onChange={e => setConfig({ adoProject: e.target.value })}
+                          placeholder="e.g. Automation Framework"
+                          className="h-9 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Repository Name</Label>
+                        <Input
+                          value={config.adoRepo}
+                          onChange={e => setConfig({ adoRepo: e.target.value })}
+                          placeholder="e.g. 13731_Automation_Framework"
+                          className="h-9 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Branch</Label>
+                        <Input
+                          value={config.adoBranch}
+                          onChange={e => setConfig({ adoBranch: e.target.value })}
+                          placeholder="main"
+                          className="h-9 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Standards Folder Path</Label>
+                        <Input
+                          value={config.adoFolderPath}
+                          onChange={e => setConfig({ adoFolderPath: e.target.value })}
+                          placeholder="layer4-standards"
+                          className="h-9 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Personal Access Token</Label>
+                        <Input
+                          type="password"
+                          value={config.adoToken}
+                          onChange={e => setConfig({ adoToken: e.target.value })}
+                          placeholder="ADO PAT (stored in browser only)"
                           className="h-9 text-sm"
                         />
                       </div>

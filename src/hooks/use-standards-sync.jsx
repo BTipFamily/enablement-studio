@@ -40,7 +40,9 @@ export function useStandardsSync() {
       ? config.githubOwner && config.githubRepo
       : config.provider === "gitlab"
         ? config.gitlabProjectId
-        : config.rawBaseUrl
+        : config.provider === "azuredevops"
+          ? config.adoOrganization && config.adoProject && config.adoRepo
+          : config.rawBaseUrl
   );
 
   const setConfig = useCallback((updates) => {
