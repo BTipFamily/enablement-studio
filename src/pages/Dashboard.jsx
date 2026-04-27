@@ -10,7 +10,7 @@ import {
   Wand2, Shield, Code2, FolderOpen, ArrowRight, 
   CheckCircle, AlertTriangle, Zap, GraduationCap,
   TrendingUp, Users, ListChecks, BarChart3, Clock,
-  Plus, Check, RotateCcw, Layers
+  Plus, Check, RotateCcw, Layers, Mail, Search, BookOpen
 } from "lucide-react";
 import { motion } from "framer-motion";
 import HealthBadge from "@/components/shared/HealthBadge";
@@ -59,6 +59,10 @@ const EVENT_LABELS = {
   complete:   { icon: Check,     color: "text-chart-2",  label: "Completed"  },
   uncomplete: { icon: RotateCcw, color: "text-muted-foreground", label: "Uncompleted" },
   path:       { icon: Layers,    color: "text-warning",  label: "Path applied" },
+  view:       { icon: BookOpen,  color: "text-chart-5",  label: "Viewed"     },
+  search:     { icon: Search,    color: "text-muted-foreground", label: "Searched" },
+  filter:     { icon: ListChecks,color: "text-muted-foreground", label: "Filtered" },
+  email:      { icon: Mail,      color: "text-primary",  label: "Emailed"    },
 };
 
 function formatRelativeTime(isoString) {
@@ -79,11 +83,13 @@ function EnablementEngagement() {
   const stats = useMemo(() => getStats(), [tick]); // re-read when tick changes
 
   const actEntries = Object.entries(stats.activities || {});
+  const catalogue   = stats.catalogue || {};
 
-  const totalAdds       = actEntries.reduce((s, [, v]) => s + (v.addCount || 0), 0);
+  const totalAdds        = actEntries.reduce((s, [, v]) => s + (v.addCount || 0), 0);
   const totalCompletions = actEntries.reduce((s, [, v]) => s + (v.completedCount || 0), 0);
+  const totalViews       = actEntries.reduce((s, [, v]) => s + (v.viewCount  || 0), 0);
   const uniqueActivities = actEntries.filter(([, v]) => (v.addCount || 0) > 0).length;
-  const completionRate  = totalAdds > 0 ? Math.round((totalCompletions / totalAdds) * 100) : 0;
+  const completionRate   = totalAdds > 0 ? Math.round((totalCompletions / totalAdds) * 100) : 0;
 
   // Top 5 by add count
   const topByAdds = [...actEntries]
@@ -97,6 +103,12 @@ function EnablementEngagement() {
     .sort((a, b) => b[1].completedCount - a[1].completedCount)
     .slice(0, 5);
 
+  // Top 5 by view count
+  const topByViews = [...actEntries]
+    .filter(([, v]) => (v.viewCount || 0) > 0)
+    .sort((a, b) => (b[1].viewCount || 0) - (a[1].viewCount || 0))
+    .slice(0, 5);
+
   // Format distribution
   const formatCounts = { live: 0, async: 0, inteam: 0 };
   actEntries.forEach(([id, v]) => {
@@ -108,10 +120,25 @@ function EnablementEngagement() {
   // Path usage
   const pathEntries = Object.entries(stats.paths || {}).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
 
-  // Recent history (first 8)
-  const recentHistory = (stats.history || []).slice(0, 8);
+  // Catalogue: top search terms (collapse duplicates)
+  const searchTerms = {};
+  (catalogue.searches || []).forEach(s => {
+    searchTerms[s.query] = (searchTerms[s.query] || 0) + 1;
+  });
+  const topSearchTerms = Object.entries(searchTerms).sort((a, b) => b[1] - a[1]).slice(0, 5);
 
-  const hasAnyData = totalAdds > 0;
+  // Catalogue: filter usage
+  const formatFilterCounts = catalogue.filterUsage?.format || {};
+  const tierFilterCounts   = catalogue.filterUsage?.tier   || {};
+  const hasFilterData = Object.keys(formatFilterCounts).length > 0 || Object.keys(tierFilterCounts).length > 0;
+
+  // Catalogue: emails sent
+  const emailsSent = catalogue.emailsSent || 0;
+
+  // Recent history (first 8, skip noisy filter events)
+  const recentHistory = (stats.history || []).filter(e => e.type !== "filter").slice(0, 8);
+
+  const hasAnyData = totalAdds > 0 || totalViews > 0 || emailsSent > 0;
 
   const handleClear = () => {
     if (window.confirm("Reset all enablement engagement statistics? This cannot be undone.")) {
@@ -154,12 +181,30 @@ function EnablementEngagement() {
             {/* Headline stats */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
-                { label: "Curriculum Enrolments", value: totalAdds,        icon: Plus,       color: "text-primary"  },
-                { label: "Activities Completed",  value: totalCompletions,  icon: Check,      color: "text-chart-2"  },
-                { label: "Unique Activities Used", value: uniqueActivities, icon: BarChart3,  color: "text-chart-5"  },
+                { label: "Curriculum Enrolments", value: totalAdds,           icon: Plus,       color: "text-primary"  },
+                { label: "Activities Completed",  value: totalCompletions,    icon: Check,      color: "text-chart-2"  },
+                { label: "Detail Views",           value: totalViews,          icon: BookOpen,   color: "text-chart-5"  },
                 { label: "Completion Rate",        value: `${completionRate}%`, icon: TrendingUp, color: completionRate >= 50 ? "text-success" : "text-warning" },
               ].map(({ label, value, icon: Icon, color }) => (
                 <div key={label} className="bg-muted/40 rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <Icon className={`w-3.5 h-3.5 ${color}`} />
+                    <span className="text-xl font-bold">{value}</span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-tight">{label}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Secondary stats row */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                { label: "Unique Activities Used", value: uniqueActivities,                    icon: BarChart3, color: "text-primary"  },
+                { label: "Searches Performed",     value: (catalogue.searches || []).length,   icon: Search,   color: "text-chart-5"  },
+                { label: "Curricula Emailed",       value: emailsSent,                          icon: Mail,     color: "text-chart-2"  },
+                { label: "Paths Applied",           value: pathEntries.reduce((s,[,v])=>s+v,0),icon: Layers,   color: "text-warning"  },
+              ].map(({ label, value, icon: Icon, color }) => (
+                <div key={label} className="bg-muted/30 rounded-lg p-3">
                   <div className="flex items-center justify-between mb-1">
                     <Icon className={`w-3.5 h-3.5 ${color}`} />
                     <span className="text-xl font-bold">{value}</span>
@@ -228,6 +273,35 @@ function EnablementEngagement() {
               )}
             </div>
 
+            {/* Most viewed activities */}
+            {topByViews.length > 0 && (
+              <div className="space-y-3">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Most Viewed (Detail Sheet)</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2">
+                  {topByViews.map(([id, v]) => {
+                    const meta = ACTIVITY_META[id];
+                    const gs = GROUP_STYLE[meta?.group] ?? GROUP_STYLE.live;
+                    const pct = Math.round(((v.viewCount || 0) / topByViews[0][1].viewCount) * 100);
+                    return (
+                      <div key={id} className="space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${gs.dot}`} />
+                            <span className="font-mono text-muted-foreground flex-shrink-0">{id}</span>
+                            <span className="truncate font-medium">{meta?.name ?? id}</span>
+                          </div>
+                          <span className="font-semibold text-muted-foreground ml-2 flex-shrink-0">{v.viewCount}</span>
+                        </div>
+                        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full transition-all duration-500 bg-chart-5/70`} style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Format distribution + path usage + recent activity */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Format mix */}
@@ -279,6 +353,53 @@ function EnablementEngagement() {
                       </div>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {/* Top search terms */}
+              {topSearchTerms.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Top Search Terms</h4>
+                  <div className="space-y-1.5">
+                    {topSearchTerms.map(([term, count]) => (
+                      <div key={term} className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <Search className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                          <span className="truncate font-mono">{term}</span>
+                        </div>
+                        <Badge variant="outline" className="ml-2 flex-shrink-0 text-[10px]">{count}×</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Filter usage */}
+              {hasFilterData && (
+                <div className="space-y-3">
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Filter Usage</h4>
+                  {Object.keys(formatFilterCounts).length > 0 && (
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Format</p>
+                      {Object.entries(formatFilterCounts).sort((a,b)=>b[1]-a[1]).map(([val, count]) => (
+                        <div key={val} className="flex items-center justify-between text-xs">
+                          <span className="capitalize">{val === "all" ? "All Formats" : val}</span>
+                          <span className="text-muted-foreground font-medium">{count}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {Object.keys(tierFilterCounts).length > 0 && (
+                    <div className="space-y-1 mt-2">
+                      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Tier</p>
+                      {Object.entries(tierFilterCounts).sort((a,b)=>b[1]-a[1]).map(([val, count]) => (
+                        <div key={val} className="flex items-center justify-between text-xs">
+                          <span>{val === "all" ? "All Tiers" : `Tier ${val}`}</span>
+                          <span className="text-muted-foreground font-medium">{count}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 

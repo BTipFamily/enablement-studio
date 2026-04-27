@@ -365,10 +365,19 @@ created_date    ISO string          type          add | remove | complete
 
 const API_CONTENT = `# API Design
 
+> **Implementation note:** The app is currently client-side only. All data is read from and written to browser \`localStorage\`. The endpoints below define the intended API contract for a future server implementation and document the shape of data available today. The **Enablement Engagement** endpoints include a JavaScript export helper that can be used right now to extract data for Power BI without a backend.
+
+---
+
 ## Standards
 
 ### GET /api/standards
 List all standards with optional category filter.
+
+**Query parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| \`category\` | string | Filter by category, e.g. \`Author+Standard\` |
 
 **Response:**
 \`\`\`json
@@ -390,6 +399,8 @@ List all standards with optional category filter.
 
 ### GET /api/standards/:slug
 Get single standard with full detail.
+
+---
 
 ## Projects
 
@@ -440,10 +451,433 @@ Run policy checks against current project state.
 ### POST /api/projects/:id/export
 Generate export artifact (ZIP or individual files).
 
+---
+
 ## Templates
 
 ### GET /api/templates?type=Python
 Get starter templates for a given automation type.
+
+---
+
+## Enablement Engagement Statistics
+
+These endpoints expose the data stored in \`localStorage\` key \`enablement_activity_stats\`. They are designed to be consumed by Power BI via the **Power BI Web connector** (pointing to a deployed instance) or extracted directly using the browser export helper below.
+
+---
+
+### GET /api/enablement/stats
+Return the full raw statistics store.
+
+**Response:**
+\`\`\`json
+{
+  "activities": {
+    "ACT-001": {
+      "addCount": 14,
+      "removeCount": 2,
+      "completedCount": 9,
+      "uncompleteCount": 1,
+      "lastAdded": "2026-04-26T10:32:00.000Z",
+      "lastCompleted": "2026-04-26T14:10:00.000Z"
+    },
+    "ACT-002": { ... }
+  },
+  "paths": {
+    "new-joiner": 7,
+    "practitioner": 4,
+    "expert": 2,
+    "full": 1
+  },
+  "history": [
+    {
+      "type": "complete",
+      "activityId": "ACT-002",
+      "timestamp": "2026-04-26T14:10:00.000Z"
+    },
+    {
+      "type": "path",
+      "pathId": "new-joiner",
+      "activityCount": 7,
+      "timestamp": "2026-04-26T09:01:00.000Z"
+    }
+  ]
+}
+\`\`\`
+
+---
+
+### GET /api/enablement/stats/summary
+Return computed headline metrics ready for a KPI card visual in Power BI.
+
+**Response:**
+\`\`\`json
+{
+  "totalEnrolments": 87,
+  "totalCompletions": 53,
+  "uniqueActivitiesUsed": 15,
+  "completionRatePct": 61,
+  "totalActivities": 18,
+  "coverageRatePct": 83,
+  "generatedAt": "2026-04-26T15:00:00.000Z"
+}
+\`\`\`
+
+**Power BI use:** Connect with the Web connector, parse JSON. Each field maps directly to a KPI card or gauge visual.
+
+---
+
+### GET /api/enablement/stats/activities
+Return per-activity metrics as a flat array — optimized for table and bar-chart visuals.
+
+**Response:**
+\`\`\`json
+{
+  "activities": [
+    {
+      "activityId": "ACT-001",
+      "activityName": "Awareness Workshop",
+      "format": "Live",
+      "audienceTier": "Tier 0",
+      "addCount": 14,
+      "removeCount": 2,
+      "netEnrolments": 12,
+      "completedCount": 9,
+      "completionRatePct": 64,
+      "lastAdded": "2026-04-26T10:32:00.000Z",
+      "lastCompleted": "2026-04-26T14:10:00.000Z"
+    }
+  ]
+}
+\`\`\`
+
+**Power BI use:**
+- Bar chart: \`activityName\` (axis) vs \`netEnrolments\` and \`completedCount\` (values) — shows adoption vs completion side by side
+- Slicer: \`format\` or \`audienceTier\` — filter by Live / Async / In-Team or by tier
+- Table: full flat list for drill-through detail
+
+---
+
+### GET /api/enablement/stats/paths
+Return suggested curriculum path usage.
+
+**Response:**
+\`\`\`json
+{
+  "paths": [
+    {
+      "pathId": "new-joiner",
+      "pathName": "New Joiner Essentials",
+      "targetTier": "Tier 0 → 1",
+      "activityCount": 7,
+      "timesApplied": 7
+    },
+    {
+      "pathId": "practitioner",
+      "pathName": "Practitioner Path",
+      "targetTier": "Tier 1 → 2",
+      "activityCount": 6,
+      "timesApplied": 4
+    }
+  ]
+}
+\`\`\`
+
+**Power BI use:** Donut or bar chart showing which curriculum paths are most used — proxy for team maturity distribution.
+
+---
+
+### GET /api/enablement/stats/history
+Return the event history log, optionally filtered by type or date range.
+
+**Query parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| \`type\` | string | Filter by event type: \`add\`, \`remove\`, \`complete\`, \`uncomplete\`, \`path\` |
+| \`from\` | ISO date | Return events on or after this date |
+| \`to\` | ISO date | Return events on or before this date |
+| \`limit\` | number | Max events to return (default 200) |
+
+**Response:**
+\`\`\`json
+{
+  "events": [
+    {
+      "type": "complete",
+      "activityId": "ACT-002",
+      "activityName": "Foundation Skills Workshop",
+      "format": "Live",
+      "audienceTier": "Tier 0 → Tier 1",
+      "pathId": null,
+      "pathName": null,
+      "activityCount": null,
+      "timestamp": "2026-04-26T14:10:00.000Z",
+      "date": "2026-04-26",
+      "hour": 14
+    }
+  ],
+  "total": 1
+}
+\`\`\`
+
+**Power BI use:**
+- Line chart: events grouped by \`date\` (x-axis) with count (y-axis) — shows engagement trend over time
+- Slicer: \`type\` to isolate completions vs enrolments
+- Heat map: \`date\` vs \`hour\` to identify peak engagement times
+
+---
+
+### DELETE /api/enablement/stats
+Reset all statistics. Requires confirmation token.
+
+**Request:**
+\`\`\`json
+{ "confirm": "RESET" }
+\`\`\`
+
+---
+
+## Enablement Catalogue Interaction Statistics *(new)*
+
+These endpoints expose browsing behaviour recorded within the Activity Catalogue itself — which activities were viewed, what was searched, which filters were applied, and how many curricula were emailed. They complement the curriculum metrics above.
+
+---
+
+### GET /api/enablement/catalogue/views
+Return per-activity view counts — how many times each detail sheet was opened.
+
+**Response:**
+\`\`\`json
+{
+  "totalDetailViews": 47,
+  "activities": [
+    {
+      "activityId":   "ACT-002",
+      "activityName": "Foundation Skills Workshop",
+      "format":       "Live",
+      "audienceTier": "Tier 0 → Tier 1",
+      "viewCount":    12,
+      "lastViewed":   "2026-04-26T11:05:00.000Z"
+    }
+  ]
+}
+\`\`\`
+
+**Power BI use:** Bar chart — \`activityName\` vs \`viewCount\` side-by-side with \`netEnrolments\` to see browse-to-enrol conversion per activity.
+
+---
+
+### GET /api/enablement/catalogue/searches
+Return search query history and aggregated term frequency.
+
+**Query parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| \`from\` | ISO date | Return searches on or after this date |
+| \`to\`   | ISO date | Return searches on or before this date |
+
+**Response:**
+\`\`\`json
+{
+  "totalSearches": 23,
+  "topTerms": [
+    { "query": "coaching", "count": 5 },
+    { "query": "tier 1",   "count": 3 },
+    { "query": "onboard",  "count": 3 }
+  ],
+  "searches": [
+    {
+      "query":        "coaching",
+      "resultsCount": 2,
+      "timestamp":    "2026-04-26T10:45:00.000Z"
+    }
+  ]
+}
+\`\`\`
+
+**Power BI use:** Word cloud or bar chart on \`topTerms\` to understand what users are looking for that the catalogue should surface more prominently.
+
+---
+
+### GET /api/enablement/catalogue/filters
+Return how often each format and tier filter was applied.
+
+**Response:**
+\`\`\`json
+{
+  "format": {
+    "all":    18,
+    "live":   12,
+    "async":  7,
+    "inteam": 4
+  },
+  "tier": {
+    "all": 22,
+    "0":   6,
+    "1":   14,
+    "2":   9,
+    "3":   3
+  }
+}
+\`\`\`
+
+**Power BI use:** Stacked bar showing filter preference distribution — signals which audience tiers or format types are most in demand.
+
+---
+
+### GET /api/enablement/catalogue/emails
+Return curriculum email statistics.
+
+**Response:**
+\`\`\`json
+{
+  "totalEmailsSent":      8,
+  "averageActivitiesPerEmail": 6.25,
+  "activityCountDistribution": [4, 7, 5, 7, 18, 7, 5, 4]
+}
+\`\`\`
+
+---
+
+## Extracting Data for Power BI (Browser Export Helper)
+
+Because the app is currently client-side, data lives in \`localStorage\`. Use the following snippet in the **browser DevTools console** to export all enablement stats — including catalogue interaction data — as a JSON file for Power BI Desktop via **Get Data → JSON**:
+
+\`\`\`javascript
+// Run in browser DevTools console on the Enablement Studio page
+(function exportEnablementStats() {
+  const raw = localStorage.getItem('enablement_activity_stats');
+  if (!raw) { console.warn('No stats found.'); return; }
+
+  const data = JSON.parse(raw);
+
+  const ACTIVITY_META = {
+    'ACT-001': { name: 'Awareness Workshop',           format: 'Live',    tier: 'Tier 0'       },
+    'ACT-002': { name: 'Foundation Skills Workshop',   format: 'Live',    tier: 'Tier 0 → 1'   },
+    'ACT-003': { name: 'Advanced Workshop',            format: 'Live',    tier: 'Tier 1 → 2'   },
+    'ACT-004': { name: 'Code Review Sessions',         format: 'Live',    tier: 'Tier 1–2'     },
+    'ACT-005': { name: 'Office Hours',                 format: 'Live',    tier: 'All Tiers'    },
+    'ACT-006': { name: 'Lunch & Learn',                format: 'Live',    tier: 'Tier 0–1'     },
+    'ACT-007': { name: 'Squad Embed / Pairing',        format: 'In-Team', tier: 'Tier 1–2'     },
+    'ACT-008': { name: 'Hackathon / Build Day',        format: 'Live',    tier: 'Tier 1–3'     },
+    'ACT-009': { name: 'Community of Practice',        format: 'Live',    tier: 'Tier 2–3'     },
+    'ACT-010': { name: 'ADR / Design Clinic',          format: 'Live',    tier: 'Tier 2–3'     },
+    'ACT-011': { name: 'Onboarding Pathway',           format: 'Async',   tier: 'All Tiers'    },
+    'ACT-012': { name: 'Pattern Library Review',       format: 'Async',   tier: 'Tier 2–3'     },
+    'ACT-013': { name: 'Newsletter / Digest',          format: 'Async',   tier: 'All Tiers'    },
+    'ACT-014': { name: 'Recorded Demo Library',        format: 'Async',   tier: 'All Tiers'    },
+    'ACT-015': { name: 'Certification Study Group',    format: 'Live',    tier: 'Tier 2–3'     },
+    'ACT-016': { name: 'First Asset Coaching',         format: 'In-Team', tier: 'Tier 1'       },
+    'ACT-017': { name: 'Legacy Classification Sprint', format: 'In-Team', tier: 'All Tiers'    },
+    'ACT-018': { name: 'Reviewer Certification',       format: 'Live',    tier: 'Tier 2–3'     },
+  };
+
+  // ── Activity stats (curriculum + views) ───────────────────────────────────
+  const activityRows = Object.entries(data.activities || {}).map(([id, m]) => ({
+    activityId:        id,
+    activityName:      ACTIVITY_META[id]?.name   ?? id,
+    format:            ACTIVITY_META[id]?.format ?? '',
+    audienceTier:      ACTIVITY_META[id]?.tier   ?? '',
+    addCount:          m.addCount        || 0,
+    removeCount:       m.removeCount     || 0,
+    netEnrolments:     (m.addCount || 0) - (m.removeCount || 0),
+    completedCount:    m.completedCount  || 0,
+    completionRatePct: m.addCount > 0
+                         ? Math.round((m.completedCount / m.addCount) * 100)
+                         : 0,
+    viewCount:         m.viewCount       || 0,
+    lastAdded:         m.lastAdded       || null,
+    lastCompleted:     m.lastCompleted   || null,
+    lastViewed:        m.lastViewed      || null,
+  }));
+
+  // ── Path stats ────────────────────────────────────────────────────────────
+  const pathRows = Object.entries(data.paths || {}).map(([pathId, count]) => ({
+    pathId,
+    timesApplied: count,
+  }));
+
+  // ── Catalogue interaction stats ───────────────────────────────────────────
+  const cat = data.catalogue || {};
+
+  // Top search terms
+  const searchTerms = {};
+  (cat.searches || []).forEach(s => {
+    searchTerms[s.query] = (searchTerms[s.query] || 0) + 1;
+  });
+  const topSearchTerms = Object.entries(searchTerms)
+    .sort((a, b) => b[1] - a[1])
+    .map(([query, count]) => ({ query, count }));
+
+  const catalogueStats = {
+    totalSearches:              (cat.searches || []).length,
+    topSearchTerms,
+    searchHistory:              cat.searches || [],
+    filterUsage:                cat.filterUsage || { format: {}, tier: {} },
+    emailsSent:                 cat.emailsSent || 0,
+    emailActivityCounts:        cat.emailActivityCounts || [],
+    avgActivitiesPerEmail:      cat.emailActivityCounts?.length > 0
+      ? +(cat.emailActivityCounts.reduce((s, v) => s + v, 0) / cat.emailActivityCounts.length).toFixed(1)
+      : 0,
+  };
+
+  // ── Full export ───────────────────────────────────────────────────────────
+  const export_ = {
+    exportedAt:       new Date().toISOString(),
+    activityStats:    activityRows,
+    pathStats:        pathRows,
+    catalogueStats,
+    eventHistory:     data.history || [],
+  };
+
+  const blob = new Blob([JSON.stringify(export_, null, 2)], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement('a'), {
+    href:     url,
+    download: \`enablement-stats-\${new Date().toISOString().slice(0, 10)}.json\`,
+  });
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  console.log(
+    'Exported', activityRows.length, 'activity rows,',
+    pathRows.length, 'path rows,',
+    export_.eventHistory.length, 'events,',
+    catalogueStats.totalSearches, 'searches,',
+    catalogueStats.emailsSent, 'emails sent.'
+  );
+})();
+\`\`\`
+
+### Loading into Power BI Desktop
+
+1. Run the export snippet above — a \`.json\` file downloads automatically.
+2. Open Power BI Desktop → **Home → Get Data → JSON**.
+3. Select the downloaded file.
+4. In Power Query Editor, expand each top-level list into a separate table:
+
+| Table | Source field | Key columns |
+|-------|-------------|-------------|
+| ActivityStats | \`activityStats\` | \`activityId\`, \`format\`, \`audienceTier\` |
+| PathStats | \`pathStats\` | \`pathId\` |
+| CatalogueSearches | \`catalogueStats.searchHistory\` | \`query\`, \`resultsCount\` |
+| FilterUsage | \`catalogueStats.filterUsage\` | \`filterType\`, \`value\` |
+| EventHistory | \`eventHistory\` | \`type\`, \`date\`, \`hour\` |
+
+5. Set correct data types: dates as *Date/Time*, counts as *Whole Number*, percentages as *Decimal Number*.
+6. Suggested visuals:
+
+| Visual | Fields |
+|--------|--------|
+| KPI cards | \`netEnrolments\`, \`completedCount\`, \`completionRatePct\`, \`emailsSent\` |
+| Clustered bar | \`activityName\` axis · \`netEnrolments\` + \`viewCount\` values (browse-to-enrol funnel) |
+| Donut chart | \`format\` legend · \`netEnrolments\` values — Live / Async / In-Team mix |
+| Stacked bar | \`audienceTier\` axis · \`netEnrolments\` values — tier coverage |
+| Line chart | \`eventHistory.date\` axis · count of events — engagement trend over time |
+| Bar chart | \`topSearchTerms.query\` axis · \`count\` — what users search for |
+| Table | Full \`activityStats\` with conditional formatting on \`completionRatePct\` |
+| Slicer | \`format\`, \`audienceTier\`, event \`type\` |
 `;
 
 const MVP_CONTENT = `# MVP Build Plan

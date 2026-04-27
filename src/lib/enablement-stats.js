@@ -1,11 +1,15 @@
 /**
  * enablement-stats.js
  * Lightweight localStorage-backed statistics tracker for the Enablement Activity Catalogue.
- * Tracks which activities are added/removed from curricula and which are completed.
+ *
+ * Tracks two categories of metrics:
+ *  1. Curriculum metrics  — add/remove/complete per activity, suggested paths applied
+ *  2. Catalogue metrics   — detail views per activity, search queries, filter usage, emails sent
  */
 
 const STORAGE_KEY = "enablement_activity_stats";
-const MAX_HISTORY = 200;
+const MAX_HISTORY  = 200;
+const MAX_SEARCHES = 100;
 
 function load() {
   try {
@@ -25,10 +29,46 @@ function save(store) {
 
 function defaultStore() {
   return {
-    activities: {},   // { [activityId]: { addCount, removeCount, completedCount, uncompleteCount, lastAdded, lastCompleted } }
-    paths: {},        // { [pathId]: number } — how many times each suggested path was applied
-    history: [],      // [ { type, activityId?, pathId?, timestamp } ]
+    // ── Curriculum metrics ─────────────────────────────────────────────────
+    activities: {},
+    // { [activityId]: {
+    //     addCount, removeCount, completedCount, uncompleteCount,
+    //     viewCount,                  ← NEW: detail sheet opens
+    //     lastAdded, lastCompleted, lastViewed
+    //   }
+    // }
+
+    paths: {},
+    // { [pathId]: number }
+
+    // ── Catalogue interaction metrics ──────────────────────────────────────
+    catalogue: {
+      searches:           [],   // SearchRecord[] (capped at MAX_SEARCHES)
+      filterUsage:        { format: {}, tier: {} },
+      emailsSent:         0,
+      emailActivityCounts: [],  // number[] — distribution of curriculum sizes emailed
+    },
+
+    // ── Rolling event log ──────────────────────────────────────────────────
+    history: [],
+    // Event[] (capped at MAX_HISTORY)
+    // types: add | remove | complete | uncomplete | path |
+    //        view | search | filter | email
   };
+}
+
+// Ensure the catalogue sub-object exists on stores persisted before this version
+function ensureCatalogue(store) {
+  if (!store.catalogue) {
+    store.catalogue = defaultStore().catalogue;
+  }
+  if (!store.catalogue.filterUsage) {
+    store.catalogue.filterUsage = { format: {}, tier: {} };
+  }
+  if (!store.catalogue.searches)           store.catalogue.searches = [];
+  if (store.catalogue.emailsSent == null)  store.catalogue.emailsSent = 0;
+  if (!store.catalogue.emailActivityCounts) store.catalogue.emailActivityCounts = [];
+  return store;
 }
 
 function activityEntry(store, id) {
@@ -38,10 +78,14 @@ function activityEntry(store, id) {
       removeCount: 0,
       completedCount: 0,
       uncompleteCount: 0,
+      viewCount: 0,
       lastAdded: null,
       lastCompleted: null,
+      lastViewed: null,
     };
   }
+  // Backfill viewCount for entries persisted before this version
+  if (store.activities[id].viewCount == null) store.activities[id].viewCount = 0;
   return store.activities[id];
 }
 
@@ -50,7 +94,7 @@ function pushHistory(store, entry) {
   if (store.history.length > MAX_HISTORY) store.history.length = MAX_HISTORY;
 }
 
-// ─── Public API ───────────────────────────────────────────────────────────────
+// ─── Curriculum API ───────────────────────────────────────────────────────────
 
 export function recordAdd(activityId) {
   const store = load();
@@ -93,10 +137,72 @@ export function recordPathApplied(pathId, activityIds) {
   save(store);
 }
 
+// ─── Catalogue Interaction API ────────────────────────────────────────────────
+
+/** Record that a user opened the detail sheet for an activity. */
+export function recordDetailView(activityId) {
+  const store = ensureCatalogue(load());
+  const entry = activityEntry(store, activityId);
+  entry.viewCount++;
+  entry.lastViewed = new Date().toISOString();
+  pushHistory(store, { type: "view", activityId });
+  save(store);
+}
+
+/**
+ * Record a catalogue search query.
+ * @param {string} query  The trimmed search string (non-empty).
+ * @param {number} resultsCount  Number of activities returned.
+ */
+export function recordSearch(query, resultsCount) {
+  if (!query || !query.trim()) return;
+  const store = ensureCatalogue(load());
+  const record = {
+    query:        query.trim().toLowerCase(),
+    resultsCount,
+    timestamp:    new Date().toISOString(),
+  };
+  store.catalogue.searches.unshift(record);
+  if (store.catalogue.searches.length > MAX_SEARCHES) {
+    store.catalogue.searches.length = MAX_SEARCHES;
+  }
+  pushHistory(store, { type: "search", query: record.query, resultsCount });
+  save(store);
+}
+
+/**
+ * Record use of a catalogue filter.
+ * @param {"format"|"tier"} filterType
+ * @param {string} value  The selected filter value (e.g. "live", "1", "all").
+ */
+export function recordFilterUsed(filterType, value) {
+  const store = ensureCatalogue(load());
+  const bucket = store.catalogue.filterUsage[filterType] || {};
+  bucket[value] = (bucket[value] || 0) + 1;
+  store.catalogue.filterUsage[filterType] = bucket;
+  pushHistory(store, { type: "filter", filterType, value });
+  save(store);
+}
+
+/**
+ * Record that a curriculum was emailed.
+ * @param {number} activityCount  Number of activities in the emailed curriculum.
+ */
+export function recordEmailSent(activityCount) {
+  const store = ensureCatalogue(load());
+  store.catalogue.emailsSent++;
+  store.catalogue.emailActivityCounts.push(activityCount);
+  pushHistory(store, { type: "email", activityCount });
+  save(store);
+}
+
+// ─── Read / Reset ─────────────────────────────────────────────────────────────
+
 export function getStats() {
-  return load();
+  return ensureCatalogue(load());
 }
 
 export function clearStats() {
   save(defaultStore());
 }
+

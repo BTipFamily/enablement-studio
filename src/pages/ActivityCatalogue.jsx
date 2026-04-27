@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { recordAdd, recordRemove, recordComplete, recordUncomplete, recordPathApplied } from "@/lib/enablement-stats";
+import { recordAdd, recordRemove, recordComplete, recordUncomplete, recordPathApplied, recordDetailView, recordSearch, recordFilterUsed, recordEmailSent } from "@/lib/enablement-stats";
 
 // ─── Activity Data ────────────────────────────────────────────────────────────
 
@@ -27,7 +27,7 @@ const ACTIVITIES = [
     audienceTier: "Tier 0", tierNums: [0],
     duration: "2 hours", frequency: "Per team onboard", owner: "Platform Architect",
     purpose: "Introduce the automation platform to teams who have had no prior exposure. Create informed stakeholders, not technical practitioners.",
-    content: ["Why automation matters to the organisation", "What the platform does and does NOT do", "How to get started", "Where to get help"],
+    content: ["Why automation matters to the organization", "What the platform does and does NOT do", "How to get started", "Where to get help"],
     facilitator: "Platform Architect or Enablement Lead",
     successCriteria: "Attendees can describe the platform purpose and identify one use case relevant to their team.",
     materials: ["Slide deck", "Platform demo (read-only)", "FAQ document", "Next-steps guide"],
@@ -110,7 +110,7 @@ const ACTIVITIES = [
     format: "Live / Collaborative", formatGroup: "live",
     audienceTier: "Tier 1–3", tierNums: [1, 2, 3],
     duration: "Full day (6–8 hrs)", frequency: "Semi-annual", owner: "CoP Lead",
-    purpose: "Create space for creative exploration, cross-team learning, and accelerated development of new automation use cases. Signals organisational commitment to the enablement programme.",
+    purpose: "Create space for creative exploration, cross-team learning, and accelerated development of new automation use cases. Signals organizational commitment to the enablement programme.",
     content: ["Teams form around a problem and build for a defined period", "Judging criteria reward creativity, reusability, and documentation quality", "Winning automations published to shared pattern library with full attribution", "Cross-functional teams encouraged — pair engineers with operations or business stakeholders"],
     facilitator: "CoP Lead",
     successCriteria: "Published automations, documented patterns, identified use case pipeline, and community energy.",
@@ -121,7 +121,7 @@ const ACTIVITIES = [
     format: "Live / Community", formatGroup: "live",
     audienceTier: "Tier 2–3", tierNums: [2, 3],
     duration: "1 hour", frequency: "Monthly", owner: "Champion Network",
-    purpose: "Sustain momentum beyond the platform team by building a self-organising practitioner community. The CoP is the long-term engine of the enablement programme.",
+    purpose: "Sustain momentum beyond the platform team by building a self-organizing practitioner community. The CoP is the long-term engine of the enablement programme.",
     content: ["Platform updates (10 min): new features, deprecations, security advisories", "Team showcase (20 min): one team presents a recently completed automation", "Pattern review (15 min): review of a submitted pattern for shared library inclusion", "Open discussion + retro (15 min): pain points, feature requests, cross-team coordination"],
     facilitator: "Elected CoP Lead from champion network. Platform team attends but does not chair after Month 3.",
     successCriteria: "Consistent attendance from champions. Action items completed between sessions.",
@@ -154,7 +154,7 @@ const ACTIVITIES = [
     format: "Async / Structured", formatGroup: "async",
     audienceTier: "Tier 2–3", tierNums: [2, 3],
     duration: "Ongoing", frequency: "Continuous", owner: "Platform Engineer",
-    purpose: "Continuously grow the shared automation pattern library through structured contribution and review. Prevents duplicate work and elevates code quality across the organisation.",
+    purpose: "Continuously grow the shared automation pattern library through structured contribution and review. Prevents duplicate work and elevates code quality across the organization.",
     content: ["Async pull request review process", "Contributors submit patterns; reviewers from platform team and CoP approve", "Pattern must include: description, use case, prerequisites, code, tested examples, known limitations, and author attribution"],
     facilitator: "Platform team and CoP reviewers.",
     successCriteria: "Initial review within 5 business days. Feedback actioned by contributor within 10 business days.",
@@ -165,7 +165,7 @@ const ACTIVITIES = [
     format: "Async / Broadcast", formatGroup: "async",
     audienceTier: "All Tiers", tierNums: [0, 1, 2, 3],
     duration: "5 min read", frequency: "Bi-weekly", owner: "Comms Lead",
-    purpose: "Maintain ambient awareness of the automation programme across the organisation without requiring active participation.",
+    purpose: "Maintain ambient awareness of the automation programme across the organization without requiring active participation.",
     content: ["Platform updates", "Upcoming enablement events", "Pattern of the fortnight", "Team spotlight", "Tip of the week"],
     facilitator: "Comms Lead or designated Enablement team member.",
     successCriteria: "Open rate, team story submissions, event registrations driven by digest.",
@@ -187,7 +187,7 @@ const ACTIVITIES = [
     format: "Live + Async", formatGroup: "live",
     audienceTier: "Tier 2–3", tierNums: [2, 3],
     duration: "6–8 weeks", frequency: "Per cohort", owner: "Champion Network",
-    purpose: "Support engineers pursuing formal vendor certification relevant to the automation platform. Signals organisational investment in individual growth.",
+    purpose: "Support engineers pursuing formal vendor certification relevant to the automation platform. Signals organizational investment in individual growth.",
     content: ["Weekly 1-hour group study session + peer accountability", "Study guide and practice exam access", "Exam fee sponsorship where applicable", "Dedicated study time allocation"],
     facilitator: "Champion Network.",
     successCriteria: "Cohort completion rate. Certification pass rate.",
@@ -319,6 +319,7 @@ function EmailCurriculumDialog({ open, onClose, activities, completedIds }) {
     const subject = encodeURIComponent("My Enablement Curriculum");
     const body = encodeURIComponent(buildEmailBody(activities, completedIds));
     window.location.href = `mailto:${encodeURIComponent(trimmed)}?subject=${subject}&body=${body}`;
+    recordEmailSent(activities.length);
     setSent(true);
     setError("");
   };
@@ -782,6 +783,18 @@ export default function ActivityCatalogue() {
   const [detailActivity, setDetailActivity] = useState(null);
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
 
+  // Debounced search tracking — fires 600ms after user stops typing
+  const searchDebounceRef = useRef(null);
+  useEffect(() => {
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    if (search.trim()) {
+      searchDebounceRef.current = setTimeout(() => {
+        recordSearch(search.trim(), filtered.length);
+      }, 600);
+    }
+    return () => { if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current); };
+  }, [search, filtered.length]);
+
   const filtered = useMemo(() => {
     return ACTIVITIES.filter(a => {
       const matchesSearch = !search ||
@@ -920,7 +933,7 @@ export default function ActivityCatalogue() {
                 {FORMAT_FILTER_OPTIONS.map(opt => (
                   <button
                     key={opt.value}
-                    onClick={() => setFormatFilter(opt.value)}
+                    onClick={() => { setFormatFilter(opt.value); recordFilterUsed("format", opt.value); }}
                     className={cn(
                       "text-xs px-3 py-1.5 rounded-full border transition-all duration-150 font-medium",
                       formatFilter === opt.value
@@ -938,7 +951,7 @@ export default function ActivityCatalogue() {
                 {TIER_FILTER_OPTIONS.map(opt => (
                   <button
                     key={opt.value}
-                    onClick={() => setTierFilter(opt.value)}
+                    onClick={() => { setTierFilter(opt.value); recordFilterUsed("tier", opt.value); }}
                     className={cn(
                       "text-xs px-3 py-1.5 rounded-full border transition-all duration-150 font-medium",
                       tierFilter === opt.value
@@ -981,7 +994,7 @@ export default function ActivityCatalogue() {
                       activity={activity}
                       isSelected={selectedIds.includes(activity.id)}
                       onSelect={toggleSelect}
-                      onViewDetail={setDetailActivity}
+                      onViewDetail={(a) => { setDetailActivity(a); recordDetailView(a.id); }}
                     />
                   ))}
                 </AnimatePresence>
@@ -1000,7 +1013,7 @@ export default function ActivityCatalogue() {
                 setCompletedIds(prev => prev.filter(x => x !== id));
               }}
               onClear={() => { setSelectedIds([]); setCompletedIds([]); }}
-              onViewDetail={setDetailActivity}
+              onViewDetail={(a) => { setDetailActivity(a); recordDetailView(a.id); }}
               onEmail={() => setEmailDialogOpen(true)}
             />
           </TabsContent>
