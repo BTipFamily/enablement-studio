@@ -99,44 +99,269 @@ const ARCHITECTURE_CONTENT = `# Architecture
 ## System Architecture
 
 \`\`\`
-┌─────────────────────────────────────────────────────┐
-│                   Frontend (React)                    │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────┐ │
-│  │Dashboard │ │Standards │ │  Wizard  │ │Workspace│ │
-│  └──────────┘ └──────────┘ └──────────┘ └────────┘ │
-│                        │                              │
-│         ┌──────────────┼──────────────┐              │
-│         │              │              │              │
-│  ┌──────────┐ ┌──────────────┐ ┌───────────┐       │
-│  │ Guardrail│ │   Template   │ │  Evidence  │       │
-│  │  Engine  │ │  Generator   │ │  Pack Gen  │       │
-│  └──────────┘ └──────────────┘ └───────────┘       │
-└─────────────────────────────────────────────────────┘
-                        │
-              ┌─────────┴─────────┐
-              │   Atelier Backend  │
-              │  ┌─────────────┐  │
-              │  │  Entities   │  │
-              │  │ - Standard  │  │
-              │  │ - Project   │  │
-              │  │ - Template  │  │
-              │  └─────────────┘  │
-              └───────────────────┘
+┌──────────────────────────────────────────────────────────────────────────┐
+│                            Frontend (React 18 + Vite)                     │
+│                                                                            │
+│  ┌───────────┐  ┌───────────┐  ┌─────────────────────┐  ┌───────────┐  │
+│  │ Dashboard │  │ Standards │  │ Activity Catalogue   │  │   Build   │  │
+│  │           │  │ Registry  │  │                      │  │  Wizard   │  │
+│  │ • Project │  │           │  │ • Activity Inventory │  │           │  │
+│  │   stats   │  │ • WHAT /  │  │ • Curriculum builder │  │ • 5-step  │  │
+│  │ • Enabl.  │  │   HOW     │  │ • Suggested paths    │  │   flow    │  │
+│  │   Engage- │  │   tabs    │  │ • Email curriculum   │  │ • Code    │  │
+│  │   ment    │  │ • Detail  │  │ • Completion tracker │  │   gen.    │  │
+│  │   panel   │  │   sheets  │  │                      │  │           │  │
+│  └─────┬─────┘  └───────────┘  └──────────┬───────────┘  └─────┬─────┘  │
+│        │                                   │                     │        │
+│  ┌───────────┐  ┌───────────┐              │              ┌───────────┐  │
+│  │ Workspace │  │   Code    │              │              │   Docs    │  │
+│  │           │  │ Validator │              │              │           │  │
+│  │ • Editor  │  │           │              │              │ • README  │  │
+│  │ • Policy  │  │ • Paste & │              │              │ • PRD     │  │
+│  │   panel   │  │   score   │              │              │ • Arch.   │  │
+│  │ • Evidence│  │ • 27      │              │              │ • API     │  │
+│  │   pack    │  │   checks  │              │              │ • MVP     │  │
+│  └─────┬─────┘  └─────┬─────┘              │              └───────────┘  │
+│        │              │                    │                              │
+│  ┌─────┴──────────────┴────┐    ┌──────────┴──────────┐                  │
+│  │     Core Libraries       │    │  enablement-stats.js │                  │
+│  │                          │    │                      │                  │
+│  │ • standards-data.js      │    │ • recordAdd()        │                  │
+│  │   (7 standards, 27       │    │ • recordRemove()     │                  │
+│  │    policy checks,        │    │ • recordComplete()   │                  │
+│  │    templates)            │    │ • recordUncomplete() │                  │
+│  │ • reference-examples.js  │    │ • recordPathApplied()│                  │
+│  │ • standards-config.js    │    │ • getStats()         │                  │
+│  │ • AuthContext.jsx        │    │ • clearStats()       │                  │
+│  │ • query-client.js        │    │                      │                  │
+│  │ • utils.js               │    └──────────┬───────────┘                  │
+│  └─────────────────────────┘               │                              │
+└───────────────────────────────────────────┼──────────────────────────────┘
+                                             │
+               ┌─────────────────────────────┼────────────────────────────┐
+               │           Browser localStorage                            │
+               │                             │                             │
+               │  ┌──────────────────────┐   │  ┌────────────────────┐   │
+               │  │  enablement_studio_  │   │  │ enablement_activity │   │
+               │  │      projects        │   │  │      _stats         │   │
+               │  │                      │   │  │                     │   │
+               │  │ Project[]            │   │  │ activities: {       │   │
+               │  │  id, name,           │   │  │   [actId]: {        │   │
+               │  │  automation_type,    │   │  │     addCount,       │   │
+               │  │  technology_area,    │   │  │     removeCount,    │   │
+               │  │  risk_tier,          │   │  │     completedCount, │   │
+               │  │  compliance_score,   │   │  │     lastAdded,      │   │
+               │  │  generated_code,     │   │  │     lastCompleted   │   │
+               │  │  status, ...         │   │  │   }                 │   │
+               │  └──────────────────────┘   │  │ }                   │   │
+               │                             │  │ paths: { [pathId]:  │   │
+               │                             │  │   count }           │   │
+               │                             │  │ history: Event[200] │   │
+               │                             │  └────────────────────┘   │
+               └─────────────────────────────────────────────────────────┘
 \`\`\`
 
-## Data Flow
+---
 
-1. **Build Wizard** → collects configuration → generates code from templates
-2. **Workspace** → edits code → runs policy checks in real-time
-3. **Policy Engine** → regex/pattern checks against code → produces check results
-4. **Evidence Pack** → aggregates project metadata + check results → exportable artifact
+## Data Flow — Build Wizard → Workspace
+
+\`\`\`
+User fills wizard steps
+        │
+        ▼
+  Step 1: Basics
+  (name, desc, type, tech)
+        │
+  Step 2: Scope & Risk
+  (risk tier, target scope,
+   credential type)
+        │
+  Step 3: Safety
+  (backout approach,
+   concurrency level)
+        │
+  Step 4: Testing
+  (testing plan, environment)
+        │
+  Step 5: Review
+  (validates + generates)
+        │
+        ▼
+  generateCode(template, formData)
+  ───────────────────────────────
+  • Selects starter template by
+    automation type
+  • Substitutes {{placeholders}}
+  • Returns: code, metadata,
+    README, backout plan
+        │
+        ▼
+  base44.entities.Project.create()
+  ───────────────────────────────
+  Persists to localStorage
+  (enablement_studio_projects)
+        │
+        ▼
+  Navigate → /Workspace?project=id
+        │
+        ▼
+  runPolicyChecks(code, metadata)
+  ───────────────────────────────
+  27 regex/pattern checks across
+  7 Author Standards
+  → CheckResult[]
+  → compliance_score (0–100)
+\`\`\`
+
+---
+
+## Data Flow — Activity Catalogue → Curriculum → Statistics
+
+\`\`\`
+User opens Activity Catalogue
+        │
+        ├─── Browse / filter / search ───▶ ActivityCard grid (18 activities)
+        │                                         │
+        │                                   Click card
+        │                                         │
+        │                                         ▼
+        │                                 ActivityDetailSheet
+        │                                 (purpose, content,
+        │                                  criteria, scheduling)
+        │                                         │
+        │                                    + / Add button
+        │                                         │
+        ├─── Select via Suggested Path ──▶  applyPath(path)
+        │    (New Joiner / Practitioner /         │
+        │     Expert / Full Programme)            │
+        │                                         │
+        │         ┌───────────────────────────────┘
+        │         │
+        │         ▼
+        │   enablement-stats.js
+        │   recordAdd(activityId)   ──▶  localStorage: enablement_activity_stats
+        │   recordPathApplied(id)         activities[id].addCount++
+        │                                 paths[pathId]++
+        │                                 history.unshift({ type, timestamp })
+        │
+        ▼
+  My Curriculum tab
+  (selectedIds[] state)
+        │
+        ├─── Tick activity ──▶ recordComplete(id)
+        │                        completedCount++
+        │
+        ├─── Untick ──────────▶ recordUncomplete(id)
+        │
+        ├─── Remove ──────────▶ recordRemove(id)
+        │                        removeCount++
+        │
+        └─── Email Curriculum
+                  │
+                  ▼
+            buildEmailBody(activities, completedIds)
+            → formats plain-text curriculum
+            → opens mailto: link in system email client
+            (no server required)
+\`\`\`
+
+---
+
+## Data Flow — Enablement Engagement Statistics → Dashboard
+
+\`\`\`
+  localStorage: enablement_activity_stats
+             │
+             ▼
+  getStats()  ─── called on Dashboard mount
+             │     and on Reset confirmation
+             │
+             ▼
+  Computed metrics:
+  ┌─────────────────────────────────────────────────────┐
+  │  totalAdds       = Σ activities[*].addCount         │
+  │  totalCompletions= Σ activities[*].completedCount   │
+  │  uniqueActivities= count(addCount > 0)              │
+  │  completionRate  = totalCompletions / totalAdds     │
+  │                                                     │
+  │  topByAdds[5]    = sort by addCount DESC            │
+  │  topByCompletions[5] = sort by completedCount DESC  │
+  │                                                     │
+  │  formatCounts = { live, async, inteam }             │
+  │    grouped by ACTIVITY_META[id].group               │
+  │                                                     │
+  │  pathEntries = Object.entries(paths)                │
+  │    sorted by count DESC                             │
+  │                                                     │
+  │  recentHistory = history.slice(0, 8)                │
+  └─────────────────────────────────────────────────────┘
+             │
+             ▼
+  EnablementEngagement component renders:
+  • 4 headline stat cards
+  • Top-5 added bar chart (colour by format group)
+  • Top-5 completed bar chart
+  • Stacked format-mix bar
+  • Paths-applied list
+  • Recent activity feed with relative timestamps
+\`\`\`
+
+---
+
+## Data Flow — Code Validator
+
+\`\`\`
+User pastes code + selects language
+        │
+        ▼
+  Optional: expand Metadata panel
+  (name, risk tier, type, testing plan)
+        │
+        ▼
+  runPolicyChecks(code, metadata)
+  ───────────────────────────────
+  Same engine as Workspace —
+  stateless, no project created
+        │
+        ▼
+  CheckResult[] rendered in-page:
+  • Pass / Fail badge per check
+  • Expandable: why it matters,
+    affected lines, fix guidance
+  • Aggregate compliance score
+\`\`\`
+
+---
 
 ## Entity Relationship
 
-- **Standard** — stores the 7 author standards with full schema
-- **Project** — automation projects with generated code and check results
-- **Template** — starter templates per automation type
+\`\`\`
+Project (localStorage)              EnablementStats (localStorage)
+─────────────────────               ──────────────────────────────
+id              UUID                activities    map<actId, Metrics>
+name            string              paths         map<pathId, number>
+automation_type string              history       Event[max 200]
+technology_area string
+risk_tier       string              Metrics
+credential_need string              ─────────────
+backout_approach string             addCount      number
+concurrency_risk string             removeCount   number
+testing_plan    string              completedCount number
+generated_code  string              uncompleteCount number
+metadata_yaml   string              lastAdded     ISO string | null
+readme_content  string              lastCompleted ISO string | null
+backout_plan    string
+compliance_score number (0–100)     Event
+status          string              ─────
+created_date    ISO string          type          add | remove | complete
+                                                  | uncomplete | path
+                                    activityId    string (optional)
+                                    pathId        string (optional)
+                                    activityCount number (optional)
+                                    timestamp     ISO string
+\`\`\`
 `;
+
 
 const API_CONTENT = `# API Design
 
