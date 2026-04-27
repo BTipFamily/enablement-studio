@@ -783,18 +783,6 @@ export default function ActivityCatalogue() {
   const [detailActivity, setDetailActivity] = useState(null);
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
 
-  // Debounced search tracking — fires 600ms after user stops typing
-  const searchDebounceRef = useRef(null);
-  useEffect(() => {
-    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-    if (search.trim()) {
-      searchDebounceRef.current = setTimeout(() => {
-        recordSearch(search.trim(), filtered.length);
-      }, 600);
-    }
-    return () => { if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current); };
-  }, [search, filtered.length]);
-
   const filtered = useMemo(() => {
     return ACTIVITIES.filter(a => {
       const matchesSearch = !search ||
@@ -806,6 +794,18 @@ export default function ActivityCatalogue() {
       return matchesSearch && matchesFormat && matchesTier;
     });
   }, [search, formatFilter, tierFilter]);
+
+  // Debounced search tracking — fires 600ms after user stops typing
+  const searchDebounceRef = useRef(null);
+  useEffect(() => {
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    if (search.trim()) {
+      searchDebounceRef.current = setTimeout(() => {
+        recordSearch(search.trim(), filtered.length);
+      }, 600);
+    }
+    return () => { if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current); };
+  }, [search, filtered.length]);
 
   const toggleSelect = (id) => {
     setSelectedIds(prev => {
@@ -824,12 +824,17 @@ export default function ActivityCatalogue() {
   };
 
   const applyPath = (path) => {
-    // Record each newly-added activity (ones not already selected)
+    const newIds = path.activityIds;
     setSelectedIds(prev => {
-      path.activityIds.forEach(id => { if (!prev.includes(id)) recordAdd(id); });
-      return path.activityIds;
+      // Record adds for activities newly entering the curriculum
+      newIds.forEach(id => { if (!prev.includes(id)) recordAdd(id); });
+      // Record removes for activities being replaced/dropped
+      prev.forEach(id => { if (!newIds.includes(id)) recordRemove(id); });
+      return newIds;
     });
-    recordPathApplied(path.id, path.activityIds);
+    // Record uncompletes for any completed activities that are being dropped
+    completedIds.forEach(id => { if (!newIds.includes(id)) recordUncomplete(id); });
+    recordPathApplied(path.id, newIds);
     setCompletedIds([]);
     setActiveTab("curriculum");
   };
@@ -1009,10 +1014,15 @@ export default function ActivityCatalogue() {
               completedIds={completedIds}
               onToggleComplete={toggleComplete}
               onRemove={(id) => {
+                recordRemove(id);
                 setSelectedIds(prev => prev.filter(x => x !== id));
                 setCompletedIds(prev => prev.filter(x => x !== id));
               }}
-              onClear={() => { setSelectedIds([]); setCompletedIds([]); }}
+              onClear={() => {
+                selectedIds.forEach(id => recordRemove(id));
+                setSelectedIds([]);
+                setCompletedIds([]);
+              }}
               onViewDetail={(a) => { setDetailActivity(a); recordDetailView(a.id); }}
               onEmail={() => setEmailDialogOpen(true)}
             />
