@@ -9,6 +9,7 @@ import { Navigate } from 'react-router-dom';
 import AppLayout from '@/components/layout/AppLayout';
 import Dashboard from '@/pages/Dashboard';
 import Standards from '@/pages/Standards';
+import ActivityCatalogue from '@/pages/ActivityCatalogue';
 import BuildWizard from '@/pages/BuildWizard';
 import Workspace from '@/pages/Workspace';
 import Documentation from '@/pages/Documentation';
@@ -71,6 +72,7 @@ const AuthenticatedApp = () => {
       <Route element={<AppLayout />}>
         <Route path="/Dashboard" element={<Dashboard />} />
         <Route path="/Standards" element={<Standards />} />
+        <Route path="/ActivityCatalogue" element={<ActivityCatalogue />} />
         <Route path="/BuildWizard" element={<BuildWizard />} />
         <Route path="/Workspace" element={<Workspace />} />
         <Route path="/Validator" element={<Validator />} />
