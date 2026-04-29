@@ -5,12 +5,13 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { 
-  Wand2, Shield, Code2, FolderOpen, ArrowRight, 
+import {
+  Wand2, Shield, Code2, FolderOpen, ArrowRight,
   CheckCircle, AlertTriangle, Zap, GraduationCap,
-  TrendingUp, Users, ListChecks, BarChart3, Clock,
-  Plus, Check, RotateCcw, Layers, Mail, Search, BookOpen
+  TrendingUp, BarChart3,
+  Plus, Check, RotateCcw, Layers,
+  Bot, User, Trophy, Target, Activity,
+  Mail, Search, BookOpen, ListChecks
 } from "lucide-react";
 import { motion } from "framer-motion";
 import HealthBadge from "@/components/shared/HealthBadge";
@@ -18,7 +19,7 @@ import { AUTHOR_STANDARDS } from "@/lib/standards-data";
 import { getHealthStatus } from "@/lib/standards-data";
 import { getStats, clearStats } from "@/lib/enablement-stats";
 
-// ─── Activity metadata (name + format group) for display ─────────────────────
+// ─── Activity metadata ────────────────────────────────────────────────────────
 const ACTIVITY_META = {
   "ACT-001": { name: "Awareness Workshop",             group: "live"   },
   "ACT-002": { name: "Foundation Skills Workshop",     group: "live"   },
@@ -47,22 +48,22 @@ const GROUP_STYLE = {
 };
 
 const PATH_LABELS = {
-  "new-joiner":  "New Joiner Essentials",
-  "practitioner":"Practitioner Path",
-  "expert":      "Expert & Champion Path",
-  "full":        "Full Programme",
+  "new-joiner":   "New Joiner Essentials",
+  "practitioner": "Practitioner Path",
+  "expert":       "Expert & Champion Path",
+  "full":         "Full Programme",
 };
 
 const EVENT_LABELS = {
-  add:        { icon: Plus,      color: "text-primary",  label: "Added"      },
-  remove:     { icon: RotateCcw, color: "text-muted-foreground", label: "Removed" },
-  complete:   { icon: Check,     color: "text-chart-2",  label: "Completed"  },
-  uncomplete: { icon: RotateCcw, color: "text-muted-foreground", label: "Uncompleted" },
-  path:       { icon: Layers,    color: "text-warning",  label: "Path applied" },
-  view:       { icon: BookOpen,  color: "text-chart-5",  label: "Viewed"     },
-  search:     { icon: Search,    color: "text-muted-foreground", label: "Searched" },
-  filter:     { icon: ListChecks,color: "text-muted-foreground", label: "Filtered" },
-  email:      { icon: Mail,      color: "text-primary",  label: "Emailed"    },
+  add:        { icon: Plus,       color: "text-primary",          label: "Added"        },
+  remove:     { icon: RotateCcw,  color: "text-muted-foreground", label: "Removed"      },
+  complete:   { icon: Check,      color: "text-chart-2",          label: "Completed"    },
+  uncomplete: { icon: RotateCcw,  color: "text-muted-foreground", label: "Uncompleted"  },
+  path:       { icon: Layers,     color: "text-warning",          label: "Path applied" },
+  view:       { icon: BookOpen,   color: "text-chart-5",          label: "Viewed"       },
+  search:     { icon: Search,     color: "text-muted-foreground", label: "Searched"     },
+  filter:     { icon: ListChecks, color: "text-muted-foreground", label: "Filtered"     },
+  email:      { icon: Mail,       color: "text-primary",          label: "Emailed"      },
 };
 
 function formatRelativeTime(isoString) {
@@ -76,40 +77,213 @@ function formatRelativeTime(isoString) {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
+// ─── Requester & Team Tracking ────────────────────────────────────────────────
+
+function RequesterStats({ projects }) {
+  const byUser = useMemo(() => {
+    const map = {};
+    projects.forEach(p => {
+      const key = p.requested_by || "Anonymous";
+      if (!map[key]) map[key] = { name: key, team: p.team || "Unknown", count: 0, totalScore: 0, passing: 0 };
+      map[key].count++;
+      map[key].totalScore += p.compliance_score || 0;
+      if ((p.compliance_score || 0) >= 80) map[key].passing++;
+    });
+    return Object.values(map).sort((a, b) => b.count - a.count);
+  }, [projects]);
+
+  const byTeam = useMemo(() => {
+    const map = {};
+    projects.forEach(p => {
+      const key = p.team || "Unknown";
+      if (!map[key]) map[key] = { team: key, count: 0, totalScore: 0, passing: 0 };
+      map[key].count++;
+      map[key].totalScore += p.compliance_score || 0;
+      if ((p.compliance_score || 0) >= 80) map[key].passing++;
+    });
+    return Object.values(map).sort((a, b) => b.count - a.count);
+  }, [projects]);
+
+  const aiCount     = projects.filter(p => p.ai_generated).length;
+  const manualCount = projects.length - aiCount;
+
+  if (projects.length === 0) {
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <Trophy className="w-4 h-4 text-primary" />
+            <CardTitle className="text-base">Automation Requesters</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="py-8 text-center text-muted-foreground">
+            <Trophy className="w-10 h-10 mx-auto mb-3 opacity-25" />
+            <p className="text-sm font-medium">No automation requests yet</p>
+            <p className="text-xs mt-1">
+              Build your first automation in the{" "}
+              <Link to="/BuildWizard" className="text-primary hover:underline">Build Wizard</Link>{" "}
+              to start tracking requesters.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Trophy className="w-4 h-4 text-primary" />
+            <CardTitle className="text-base">Automation Requesters</CardTitle>
+          </div>
+          <Link to="/BuildWizard">
+            <Button variant="ghost" size="sm" className="text-xs">
+              New <ArrowRight className="w-3 h-3 ml-1" />
+            </Button>
+          </Link>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Build method breakdown */}
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            { label: "Total Automations", value: projects.length, icon: Activity, color: "text-primary" },
+            { label: "AI-Generated",      value: aiCount,         icon: Bot,      color: "text-chart-5" },
+            { label: "Manual",            value: manualCount,     icon: User,     color: "text-chart-2" },
+          ].map(({ label, value, icon: Icon, color }) => (
+            <div key={label} className="bg-muted/40 rounded-lg p-3">
+              <div className="flex items-center justify-between mb-1">
+                <Icon className={`w-3.5 h-3.5 ${color}`} />
+                <span className="text-xl font-bold">{value}</span>
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-tight">{label}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Per-user leaderboard */}
+          <div className="space-y-3">
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <Trophy className="w-3.5 h-3.5 text-warning" />
+              Top Requesters
+            </h4>
+            <div className="space-y-2">
+              {byUser.slice(0, 6).map((u, idx) => {
+                const passRate = u.count > 0 ? Math.round((u.passing / u.count) * 100) : 0;
+                const maxCount = byUser[0]?.count || 1;
+                return (
+                  <div key={u.name} className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-muted-foreground flex-shrink-0 w-4 text-right">{idx + 1}</span>
+                        <div className="min-w-0">
+                          <span className="font-medium truncate block">{u.name}</span>
+                          {u.team && u.team !== "Unknown" && (
+                            <span className="text-muted-foreground/70 text-[10px]">{u.team}</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                        <span className="text-muted-foreground">{u.count} built</span>
+                        <span className={`font-semibold ${passRate >= 80 ? "text-success" : passRate >= 50 ? "text-warning" : "text-destructive"}`}>
+                          {passRate}% pass
+                        </span>
+                      </div>
+                    </div>
+                    <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${passRate >= 80 ? "bg-success" : passRate >= 50 ? "bg-warning" : "bg-destructive"}`}
+                        style={{ width: `${(u.count / maxCount) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Per-team breakdown */}
+          <div className="space-y-3">
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <Target className="w-3.5 h-3.5 text-chart-2" />
+              Team Value
+            </h4>
+            <div className="space-y-2">
+              {byTeam.slice(0, 6).map(t => {
+                const avg = t.count > 0 ? Math.round(t.totalScore / t.count) : 0;
+                return (
+                  <div key={t.team} className="flex items-center justify-between p-2 rounded-lg bg-muted/30">
+                    <div>
+                      <p className="text-xs font-medium">{t.team}</p>
+                      <p className="text-[10px] text-muted-foreground">{t.count} automation{t.count !== 1 ? "s" : ""}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className={`text-sm font-bold ${avg >= 80 ? "text-success" : avg >= 50 ? "text-warning" : "text-destructive"}`}>
+                        {avg}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">avg score</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Compliance distribution */}
+        <div className="space-y-2">
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Overall Value Delivery</h4>
+          {(() => {
+            const passing = projects.filter(p => (p.compliance_score || 0) >= 80).length;
+            const amber   = projects.filter(p => { const s = p.compliance_score || 0; return s >= 50 && s < 80; }).length;
+            const failing = projects.filter(p => (p.compliance_score || 0) < 50).length;
+            const total   = projects.length;
+            return (
+              <div className="flex gap-1 items-center text-xs">
+                <div className="flex-1 h-3 rounded-full overflow-hidden bg-muted flex">
+                  <div className="bg-success h-full" style={{ width: `${(passing / total) * 100}%` }} />
+                  <div className="bg-warning h-full" style={{ width: `${(amber / total) * 100}%` }} />
+                  <div className="bg-destructive h-full" style={{ width: `${(failing / total) * 100}%` }} />
+                </div>
+                <span className="text-success font-medium ml-2">{passing} passing</span>
+                {amber   > 0 && <span className="text-warning font-medium">· {amber} amber</span>}
+                {failing > 0 && <span className="text-destructive font-medium">· {failing} failing</span>}
+              </div>
+            );
+          })()}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 // ─── Enablement Engagement panel ─────────────────────────────────────────────
 
 function EnablementEngagement() {
   const [tick, setTick] = React.useState(0);
-  const stats = useMemo(() => getStats(), [tick]); // re-read when tick changes
+  const stats = useMemo(() => getStats(), [tick]);
 
   const actEntries = Object.entries(stats.activities || {});
-  const catalogue   = stats.catalogue || {};
 
   const totalAdds        = actEntries.reduce((s, [, v]) => s + (v.addCount || 0), 0);
   const totalCompletions = actEntries.reduce((s, [, v]) => s + (v.completedCount || 0), 0);
-  const totalViews       = actEntries.reduce((s, [, v]) => s + (v.viewCount  || 0), 0);
   const uniqueActivities = actEntries.filter(([, v]) => (v.addCount || 0) > 0).length;
   const completionRate   = totalAdds > 0 ? Math.round((totalCompletions / totalAdds) * 100) : 0;
 
-  // Top 5 by add count
   const topByAdds = [...actEntries]
     .filter(([, v]) => v.addCount > 0)
     .sort((a, b) => b[1].addCount - a[1].addCount)
     .slice(0, 5);
 
-  // Top 5 by completions
   const topByCompletions = [...actEntries]
     .filter(([, v]) => v.completedCount > 0)
     .sort((a, b) => b[1].completedCount - a[1].completedCount)
     .slice(0, 5);
 
-  // Top 5 by view count
-  const topByViews = [...actEntries]
-    .filter(([, v]) => (v.viewCount || 0) > 0)
-    .sort((a, b) => (b[1].viewCount || 0) - (a[1].viewCount || 0))
-    .slice(0, 5);
-
-  // Format distribution
   const formatCounts = { live: 0, async: 0, inteam: 0 };
   actEntries.forEach(([id, v]) => {
     const g = ACTIVITY_META[id]?.group;
@@ -117,28 +291,9 @@ function EnablementEngagement() {
   });
   const formatTotal = Object.values(formatCounts).reduce((s, v) => s + v, 0);
 
-  // Path usage
-  const pathEntries = Object.entries(stats.paths || {}).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
-
-  // Catalogue: top search terms (collapse duplicates)
-  const searchTerms = {};
-  (catalogue.searches || []).forEach(s => {
-    searchTerms[s.query] = (searchTerms[s.query] || 0) + 1;
-  });
-  const topSearchTerms = Object.entries(searchTerms).sort((a, b) => b[1] - a[1]).slice(0, 5);
-
-  // Catalogue: filter usage
-  const formatFilterCounts = catalogue.filterUsage?.format || {};
-  const tierFilterCounts   = catalogue.filterUsage?.tier   || {};
-  const hasFilterData = Object.keys(formatFilterCounts).length > 0 || Object.keys(tierFilterCounts).length > 0;
-
-  // Catalogue: emails sent
-  const emailsSent = catalogue.emailsSent || 0;
-
-  // Recent history (first 8, skip noisy filter events)
-  const recentHistory = (stats.history || []).filter(e => e.type !== "filter").slice(0, 8);
-
-  const hasAnyData = totalAdds > 0 || totalViews > 0 || emailsSent > 0;
+  const pathEntries   = Object.entries(stats.paths || {}).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+  const recentHistory = (stats.history || []).slice(0, 8);
+  const hasAnyData    = totalAdds > 0;
 
   const handleClear = () => {
     if (window.confirm("Reset all enablement engagement statistics? This cannot be undone.")) {
@@ -178,12 +333,11 @@ function EnablementEngagement() {
           </div>
         ) : (
           <>
-            {/* Headline stats */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
-                { label: "Curriculum Enrolments", value: totalAdds,           icon: Plus,       color: "text-primary"  },
-                { label: "Activities Completed",  value: totalCompletions,    icon: Check,      color: "text-chart-2"  },
-                { label: "Detail Views",           value: totalViews,          icon: BookOpen,   color: "text-chart-5"  },
+                { label: "Curriculum Enrolments", value: totalAdds,            icon: Plus,       color: "text-primary"  },
+                { label: "Activities Completed",  value: totalCompletions,      icon: Check,      color: "text-chart-2"  },
+                { label: "Unique Activities Used", value: uniqueActivities,     icon: BarChart3,  color: "text-chart-5"  },
                 { label: "Completion Rate",        value: `${completionRate}%`, icon: TrendingUp, color: completionRate >= 50 ? "text-success" : "text-warning" },
               ].map(({ label, value, icon: Icon, color }) => (
                 <div key={label} className="bg-muted/40 rounded-lg p-3">
@@ -196,34 +350,15 @@ function EnablementEngagement() {
               ))}
             </div>
 
-            {/* Secondary stats row */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {[
-                { label: "Unique Activities Used", value: uniqueActivities,                    icon: BarChart3, color: "text-primary"  },
-                { label: "Searches Performed",     value: (catalogue.searches || []).length,   icon: Search,   color: "text-chart-5"  },
-                { label: "Curricula Emailed",       value: emailsSent,                          icon: Mail,     color: "text-chart-2"  },
-                { label: "Paths Applied",           value: pathEntries.reduce((s,[,v])=>s+v,0),icon: Layers,   color: "text-warning"  },
-              ].map(({ label, value, icon: Icon, color }) => (
-                <div key={label} className="bg-muted/30 rounded-lg p-3">
-                  <div className="flex items-center justify-between mb-1">
-                    <Icon className={`w-3.5 h-3.5 ${color}`} />
-                    <span className="text-xl font-bold">{value}</span>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground leading-tight">{label}</p>
-                </div>
-              ))}
-            </div>
-
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Top added activities */}
               {topByAdds.length > 0 && (
                 <div className="space-y-3">
                   <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Most Added to Curricula</h4>
                   <div className="space-y-2">
                     {topByAdds.map(([id, v]) => {
                       const meta = ACTIVITY_META[id];
-                      const pct = Math.round(((v.addCount || 0) / topByAdds[0][1].addCount) * 100);
-                      const gs = GROUP_STYLE[meta?.group] ?? GROUP_STYLE.live;
+                      const pct  = Math.round(((v.addCount || 0) / topByAdds[0][1].addCount) * 100);
+                      const gs   = GROUP_STYLE[meta?.group] ?? GROUP_STYLE.live;
                       return (
                         <div key={id} className="space-y-1">
                           <div className="flex items-center justify-between text-xs">
@@ -244,14 +379,13 @@ function EnablementEngagement() {
                 </div>
               )}
 
-              {/* Top completed activities */}
               {topByCompletions.length > 0 && (
                 <div className="space-y-3">
                   <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Most Completed</h4>
                   <div className="space-y-2">
                     {topByCompletions.map(([id, v]) => {
                       const meta = ACTIVITY_META[id];
-                      const pct = Math.round(((v.completedCount || 0) / topByCompletions[0][1].completedCount) * 100);
+                      const pct  = Math.round(((v.completedCount || 0) / topByCompletions[0][1].completedCount) * 100);
                       return (
                         <div key={id} className="space-y-1">
                           <div className="flex items-center justify-between text-xs">
@@ -273,54 +407,15 @@ function EnablementEngagement() {
               )}
             </div>
 
-            {/* Most viewed activities */}
-            {topByViews.length > 0 && (
-              <div className="space-y-3">
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Most Viewed (Detail Sheet)</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2">
-                  {topByViews.map(([id, v]) => {
-                    const meta = ACTIVITY_META[id];
-                    const gs = GROUP_STYLE[meta?.group] ?? GROUP_STYLE.live;
-                    const pct = Math.round(((v.viewCount || 0) / topByViews[0][1].viewCount) * 100);
-                    return (
-                      <div key={id} className="space-y-1">
-                        <div className="flex items-center justify-between text-xs">
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${gs.dot}`} />
-                            <span className="font-mono text-muted-foreground flex-shrink-0">{id}</span>
-                            <span className="truncate font-medium">{meta?.name ?? id}</span>
-                          </div>
-                          <span className="font-semibold text-muted-foreground ml-2 flex-shrink-0">{v.viewCount}</span>
-                        </div>
-                        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                          <div className={`h-full rounded-full transition-all duration-500 bg-chart-5/70`} style={{ width: `${pct}%` }} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Format distribution + path usage + recent activity */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Format mix */}
               {formatTotal > 0 && (
                 <div className="space-y-3">
                   <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Format Mix</h4>
-                  {/* Stacked bar */}
                   <div className="h-3 rounded-full overflow-hidden flex">
                     {Object.entries(formatCounts).map(([g, count]) => {
                       if (!count) return null;
                       const gs = GROUP_STYLE[g];
-                      return (
-                        <div
-                          key={g}
-                          className={`h-full ${gs.bar} transition-all duration-500`}
-                          style={{ width: `${(count / formatTotal) * 100}%` }}
-                          title={`${gs.label}: ${count}`}
-                        />
-                      );
+                      return <div key={g} className={`h-full ${gs.bar}`} style={{ width: `${(count / formatTotal) * 100}%` }} />;
                     })}
                   </div>
                   <div className="space-y-1">
@@ -341,7 +436,6 @@ function EnablementEngagement() {
                 </div>
               )}
 
-              {/* Suggested path usage */}
               {pathEntries.length > 0 && (
                 <div className="space-y-3">
                   <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Paths Applied</h4>
@@ -356,69 +450,21 @@ function EnablementEngagement() {
                 </div>
               )}
 
-              {/* Top search terms */}
-              {topSearchTerms.length > 0 && (
-                <div className="space-y-3">
-                  <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Top Search Terms</h4>
-                  <div className="space-y-1.5">
-                    {topSearchTerms.map(([term, count]) => (
-                      <div key={term} className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <Search className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-                          <span className="truncate font-mono">{term}</span>
-                        </div>
-                        <Badge variant="outline" className="ml-2 flex-shrink-0 text-[10px]">{count}×</Badge>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Filter usage */}
-              {hasFilterData && (
-                <div className="space-y-3">
-                  <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Filter Usage</h4>
-                  {Object.keys(formatFilterCounts).length > 0 && (
-                    <div className="space-y-1">
-                      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Format</p>
-                      {Object.entries(formatFilterCounts).sort((a,b)=>b[1]-a[1]).map(([val, count]) => (
-                        <div key={val} className="flex items-center justify-between text-xs">
-                          <span className="capitalize">{val === "all" ? "All Formats" : val}</span>
-                          <span className="text-muted-foreground font-medium">{count}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {Object.keys(tierFilterCounts).length > 0 && (
-                    <div className="space-y-1 mt-2">
-                      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Tier</p>
-                      {Object.entries(tierFilterCounts).sort((a,b)=>b[1]-a[1]).map(([val, count]) => (
-                        <div key={val} className="flex items-center justify-between text-xs">
-                          <span>{val === "all" ? "All Tiers" : `Tier ${val}`}</span>
-                          <span className="text-muted-foreground font-medium">{count}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Recent activity */}
               {recentHistory.length > 0 && (
                 <div className="space-y-3">
                   <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Recent Activity</h4>
                   <div className="space-y-2">
                     {recentHistory.map((event, i) => {
-                      const ev = EVENT_LABELS[event.type] ?? EVENT_LABELS.add;
+                      const ev   = EVENT_LABELS[event.type] ?? EVENT_LABELS.add;
                       const Icon = ev.icon;
-                      const actName = event.activityId ? (ACTIVITY_META[event.activityId]?.name ?? event.activityId) : null;
-                      const pathName = event.pathId ? (PATH_LABELS[event.pathId] ?? event.pathId) : null;
+                      const actName  = event.activityId ? (ACTIVITY_META[event.activityId]?.name ?? event.activityId) : null;
+                      const pathName = event.pathId     ? (PATH_LABELS[event.pathId] ?? event.pathId) : null;
                       return (
                         <div key={i} className="flex items-start gap-2 text-xs">
                           <Icon className={`w-3 h-3 mt-0.5 flex-shrink-0 ${ev.color}`} />
                           <div className="flex-1 min-w-0">
                             <span className="font-medium">{ev.label}</span>
-                            {actName && <span className="text-muted-foreground"> · {actName}</span>}
+                            {actName  && <span className="text-muted-foreground"> · {actName}</span>}
                             {pathName && <span className="text-muted-foreground"> · {pathName}{event.activityCount ? ` (${event.activityCount} activities)` : ""}</span>}
                           </div>
                           <span className="text-muted-foreground flex-shrink-0">{formatRelativeTime(event.timestamp)}</span>
@@ -445,24 +491,14 @@ const fadeIn = {
 export default function Dashboard() {
   const { data: projects = [] } = useQuery({
     queryKey: ["projects"],
-    queryFn: () => base44.entities.Project.list("-created_date", 10),
+    queryFn: () => base44.entities.Project.list("-created_date", 50),
   });
 
   const stats = [
-    { label: "Author Standards", value: "7", icon: Shield, color: "text-primary" },
-    { label: "Projects", value: projects.length.toString(), icon: FolderOpen, color: "text-chart-2" },
-    { 
-      label: "Passing", 
-      value: projects.filter(p => (p.compliance_score || 0) >= 80).length.toString(), 
-      icon: CheckCircle, 
-      color: "text-success" 
-    },
-    { 
-      label: "Need Attention", 
-      value: projects.filter(p => (p.compliance_score || 0) < 80).length.toString(), 
-      icon: AlertTriangle, 
-      color: "text-warning" 
-    },
+    { label: "Author Standards", value: "7",                                                                        icon: Shield,        color: "text-primary"  },
+    { label: "Projects",         value: projects.length.toString(),                                                 icon: FolderOpen,    color: "text-chart-2"  },
+    { label: "Passing",          value: projects.filter(p => (p.compliance_score || 0) >= 80).length.toString(),    icon: CheckCircle,   color: "text-success"  },
+    { label: "Need Attention",   value: projects.filter(p => (p.compliance_score || 0) < 80).length.toString(),     icon: AlertTriangle, color: "text-warning"  },
   ];
 
   return (
@@ -527,13 +563,18 @@ export default function Dashboard() {
         ))}
       </motion.div>
 
-      {/* Enablement Engagement */}
+      {/* Requester & Team Tracking */}
       <motion.div {...fadeIn} transition={{ delay: 0.3 }}>
+        <RequesterStats projects={projects} />
+      </motion.div>
+
+      {/* Enablement Engagement */}
+      <motion.div {...fadeIn} transition={{ delay: 0.4 }}>
         <EnablementEngagement />
       </motion.div>
 
       {/* Standards Overview */}
-      <motion.div {...fadeIn} transition={{ delay: 0.4 }}>
+      <motion.div {...fadeIn} transition={{ delay: 0.5 }}>
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
@@ -548,15 +589,9 @@ export default function Dashboard() {
           <CardContent>
             <div className="space-y-2">
               {AUTHOR_STANDARDS.map((std, i) => (
-                <Link
-                  key={std.slug}
-                  to={`/Standards?standard=${std.slug}`}
-                  className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 transition-colors group"
-                >
+                <Link key={std.slug} to={`/Standards?standard=${std.slug}`} className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 transition-colors group">
                   <div className="flex items-center gap-3">
-                    <div className="w-7 h-7 rounded-md bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
-                      {i + 1}
-                    </div>
+                    <div className="w-7 h-7 rounded-md bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">{i + 1}</div>
                     <div>
                       <p className="text-sm font-medium group-hover:text-primary transition-colors">{std.name}</p>
                       <p className="text-xs text-muted-foreground line-clamp-1">{std.standard_statement}</p>
@@ -572,7 +607,7 @@ export default function Dashboard() {
 
       {/* Recent Projects */}
       {projects.length > 0 && (
-        <motion.div {...fadeIn} transition={{ delay: 0.5 }}>
+        <motion.div {...fadeIn} transition={{ delay: 0.6 }}>
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Recent Projects</CardTitle>
@@ -580,24 +615,29 @@ export default function Dashboard() {
             <CardContent>
               <div className="space-y-2">
                 {projects.slice(0, 5).map(project => (
-                  <Link
-                    key={project.id}
-                    to={`/Workspace?project=${project.id}`}
-                    className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 transition-colors"
-                  >
+                  <Link key={project.id} to={`/Workspace?project=${project.id}`} className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 transition-colors">
                     <div className="flex items-center gap-3">
-                      <Code2 className="w-4 h-4 text-muted-foreground" />
+                      {project.ai_generated
+                        ? <Bot className="w-4 h-4 text-primary/60" />
+                        : <Code2 className="w-4 h-4 text-muted-foreground" />}
                       <div>
                         <p className="text-sm font-medium">{project.name}</p>
-                        <p className="text-xs text-muted-foreground">{project.automation_type} · {project.technology_area}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {project.automation_type} · {project.technology_area}
+                          {project.requested_by && project.requested_by !== "Anonymous" && (
+                            <span className="ml-1 opacity-70">· {project.requested_by}</span>
+                          )}
+                        </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
+                      {project.ai_generated && (
+                        <Badge variant="secondary" className="text-[10px] gap-1">
+                          <Bot className="w-2.5 h-2.5" />AI
+                        </Badge>
+                      )}
                       {project.compliance_score !== undefined && (
-                        <HealthBadge 
-                          status={getHealthStatus(project.compliance_score)} 
-                          score={project.compliance_score} 
-                        />
+                        <HealthBadge status={getHealthStatus(project.compliance_score)} score={project.compliance_score} />
                       )}
                       <Badge variant="outline" className="text-[10px]">{project.status}</Badge>
                     </div>
